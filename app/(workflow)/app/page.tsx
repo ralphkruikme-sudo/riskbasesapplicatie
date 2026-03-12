@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Search, X, FolderOpen, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const supabase = createClient(
@@ -201,18 +201,54 @@ export default function ProjectsPage() {
   }
 
   async function handleDeleteProject(projectId: string) {
-    if (!confirm("Weet je zeker dat je dit project wilt verwijderen?")) return;
+    if (!confirm("Weet je zeker dat je dit project definitief wilt verwijderen?")) {
+      return;
+    }
 
     setDeletingProjectId(projectId);
+    setMessage("");
+
     try {
-      const { error } = await supabase
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error("No user found.");
+
+      const { data: membership, error: membershipError } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (membershipError || !membership?.workspace_id) {
+        throw new Error("No workspace membership found.");
+      }
+
+      const { error: membersDeleteError } = await supabase
+        .from("project_members")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (membersDeleteError) throw membersDeleteError;
+
+      const { data: deletedProjects, error: projectDeleteError } = await supabase
         .from("projects")
         .delete()
-        .eq("id", projectId);
+        .eq("id", projectId)
+        .eq("workspace_id", membership.workspace_id)
+        .select("id");
 
-      if (error) throw error;
+      if (projectDeleteError) throw projectDeleteError;
+
+      if (!deletedProjects || deletedProjects.length === 0) {
+        throw new Error(
+          "Project was not deleted in Supabase. Check RLS policies or foreign key constraints."
+        );
+      }
 
       setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setMessage("Project deleted permanently.");
     } catch (error: any) {
       setMessage(error?.message || "Could not delete project.");
     } finally {
@@ -268,7 +304,7 @@ export default function ProjectsPage() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-[185px] animate-pulse rounded-2xl border border-slate-200 bg-white"
+                className="h-[220px] animate-pulse rounded-2xl border border-slate-200 bg-white"
               />
             ))}
           </div>
@@ -293,7 +329,7 @@ export default function ProjectsPage() {
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
               >
                 <div className="flex items-start gap-4 p-5">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100">
@@ -346,20 +382,23 @@ export default function ProjectsPage() {
                     Last updated: {timeAgo(project.updated_at)}
                   </p>
 
-                  <div className="mt-4 flex items-center gap-2">
+                  <div className="mt-5 flex items-center justify-between gap-3">
                     <button
                       type="button"
                       onClick={() => router.push(`/app/projects/${project.id}`)}
-                      className="flex-1 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600"
+                      className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-600"
                     >
+                      <FolderOpen className="h-4 w-4" />
                       Open
                     </button>
+
                     <button
                       type="button"
                       onClick={() => handleDeleteProject(project.id)}
                       disabled={deletingProjectId === project.id}
-                      className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                      className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                     >
+                      <Trash2 className="h-4 w-4" />
                       {deletingProjectId === project.id ? "Deleting..." : "Delete"}
                     </button>
                   </div>
