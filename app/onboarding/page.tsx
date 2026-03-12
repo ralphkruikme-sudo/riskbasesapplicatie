@@ -33,19 +33,40 @@ export default function OnboardingPage() {
     try {
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No user found.");
+      if (authError || !user) throw new Error("Niet ingelogd.");
 
+      const trimmedKey = workspaceKey.trim().toUpperCase();
+
+      if (!trimmedKey) throw new Error("Voer een workspace key in.");
+
+      // Find workspace by join_key
       const { data: workspace, error: workspaceError } = await supabase
         .from("workspaces")
         .select("id, join_key")
-        .eq("join_key", workspaceKey.trim().toUpperCase())
+        .eq("join_key", trimmedKey)
         .maybeSingle();
 
       if (workspaceError) throw workspaceError;
-      if (!workspace) throw new Error("Workspace key not found.");
+      if (!workspace) throw new Error("Workspace key niet gevonden. Controleer de key en probeer opnieuw.");
 
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
+        .from("workspace_members")
+        .select("id")
+        .eq("workspace_id", workspace.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existingMember) {
+        // Already a member, just redirect
+        router.push("/app");
+        return;
+      }
+
+      // Add user as member
       const { error: memberError } = await supabase
         .from("workspace_members")
         .insert({
@@ -54,17 +75,11 @@ export default function OnboardingPage() {
           role: "member",
         });
 
-      if (memberError) {
-        if (memberError.message?.toLowerCase().includes("duplicate")) {
-          router.push("/app");
-          return;
-        }
-        throw memberError;
-      }
+      if (memberError) throw memberError;
 
       router.push("/app");
     } catch (error: any) {
-      setMessage(error?.message || "Could not join workspace.");
+      setMessage(error?.message || "Kon workspace niet joinen.");
     } finally {
       setLoadingJoin(false);
     }
@@ -78,19 +93,15 @@ export default function OnboardingPage() {
       const trimmedWorkspaceName = workspaceName.trim();
       const trimmedCompanyName = companyName.trim();
 
-      if (!trimmedWorkspaceName) {
-        throw new Error("Please enter a workspace name.");
-      }
-
-      if (!trimmedCompanyName) {
-        throw new Error("Please enter a company name.");
-      }
+      if (!trimmedWorkspaceName) throw new Error("Voer een workspace naam in.");
+      if (!trimmedCompanyName) throw new Error("Voer een bedrijfsnaam in.");
 
       const {
         data: { user },
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No user found.");
+      if (authError || !user) throw new Error("Niet ingelogd.");
 
       const joinKey = generateJoinKey();
 
@@ -106,7 +117,7 @@ export default function OnboardingPage() {
         .single();
 
       if (workspaceError) throw workspaceError;
-      if (!workspace) throw new Error("Workspace could not be created.");
+      if (!workspace) throw new Error("Workspace kon niet worden aangemaakt.");
 
       const { error: memberError } = await supabase
         .from("workspace_members")
@@ -120,7 +131,7 @@ export default function OnboardingPage() {
 
       router.push("/app");
     } catch (error: any) {
-      setMessage(error?.message || "Could not create workspace.");
+      setMessage(error?.message || "Kon workspace niet aanmaken.");
     } finally {
       setLoadingCreate(false);
     }
@@ -129,6 +140,13 @@ export default function OnboardingPage() {
   function closeModal() {
     if (loadingCreate) return;
     setShowCreateModal(false);
+  }
+
+  // Allow pressing Enter to submit join
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && workspaceKey.trim()) {
+      handleJoinWorkspace();
+    }
   }
 
   return (
@@ -168,6 +186,9 @@ export default function OnboardingPage() {
                       placeholder="Enter workspace key"
                       value={workspaceKey}
                       onChange={(e) => setWorkspaceKey(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      autoComplete="off"
+                      spellCheck={false}
                       className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
                     />
                   </div>

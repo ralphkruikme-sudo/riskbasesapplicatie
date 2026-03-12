@@ -48,6 +48,8 @@ export default function WorkflowLayout({
   const router = useRouter();
   const pathname = usePathname();
 
+  const isProjectRoute = pathname.startsWith("/app/projects/");
+
   const [expanded, setExpanded] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -208,24 +210,28 @@ export default function WorkflowLayout({
       key: "team",
       label: "Team",
       icon: Users,
-      onClick: () => setModal("team" as ModalType),
+      onClick: () => setModal("team"),
       active: false,
     },
     {
       key: "billing",
       label: "Billing",
       icon: CreditCard,
-      onClick: () => setModal("billing" as ModalType),
+      onClick: () => setModal("billing"),
       active: false,
     },
     {
       key: "settings",
       label: "Settings",
       icon: Settings,
-      onClick: () => setModal("settings" as ModalType),
+      onClick: () => setModal("settings"),
       active: false,
     },
   ];
+
+  if (isProjectRoute) {
+    return <>{children}</>;
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f7fb]">
@@ -324,11 +330,14 @@ export default function WorkflowLayout({
                     className="h-10 w-10 rounded-full object-cover"
                   />
                 ) : (
-                  <img
-                    src="/avatar.png"
-                    alt={displayName}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 text-sm font-semibold text-white">
+                    {displayName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()}
+                  </div>
                 )}
 
                 <span className="hidden text-[17px] font-medium text-slate-700 sm:block">
@@ -427,18 +436,21 @@ export default function WorkflowLayout({
                                   className="h-11 w-11 rounded-full object-cover"
                                 />
                               ) : (
-                                <img
-                                  src="/avatar.png"
-                                  alt={member.full_name || "Member"}
-                                  className="h-11 w-11 rounded-full object-cover"
-                                />
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-500 text-sm font-semibold text-white">
+                                  {(member.full_name || "TM")
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .slice(0, 2)
+                                    .join("")
+                                    .toUpperCase()}
+                                </div>
                               )}
 
                               <div>
                                 <p className="text-[15px] font-medium text-slate-800">
                                   {member.full_name || "Team member"}
                                 </p>
-                                <p className="text-sm text-slate-500 capitalize">
+                                <p className="text-sm capitalize text-slate-500">
                                   {member.role}
                                 </p>
                               </div>

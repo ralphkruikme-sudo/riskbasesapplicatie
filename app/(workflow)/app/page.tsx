@@ -66,6 +66,7 @@ export default function ProjectsPage() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">(
@@ -165,20 +166,57 @@ export default function ProjectsPage() {
 
       if (projectError) throw projectError;
 
-      const { error: memberError } = await supabase.from("project_members").insert({
-        project_id: project.id,
-        user_id: user.id,
-        role: "owner",
-      });
+      const { error: memberError } = await supabase
+        .from("project_members")
+        .insert({
+          project_id: project.id,
+          user_id: user.id,
+          role: "owner",
+        });
 
       if (memberError) throw memberError;
 
       setProjects((prev) => [project, ...prev]);
       setShowCreateModal(false);
+
+      if (intakeMethod === "manual") {
+        router.push(`/app/projects/${project.id}/intake/step-1`);
+        return;
+      }
+
+      if (intakeMethod === "csv") {
+        router.push(`/app/projects/${project.id}/import/csv`);
+        return;
+      }
+
+      if (intakeMethod === "api") {
+        router.push(`/app/projects/${project.id}/import/api`);
+        return;
+      }
     } catch (error: any) {
       setMessage(error?.message || "Could not create project.");
     } finally {
       setCreatingProject(false);
+    }
+  }
+
+  async function handleDeleteProject(projectId: string) {
+    if (!confirm("Weet je zeker dat je dit project wilt verwijderen?")) return;
+
+    setDeletingProjectId(projectId);
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
+
+      if (error) throw error;
+
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch (error: any) {
+      setMessage(error?.message || "Could not delete project.");
+    } finally {
+      setDeletingProjectId(null);
     }
   }
 
@@ -258,7 +296,7 @@ export default function ProjectsPage() {
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
                 <div className="flex items-start gap-4 p-5">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100">
                     <img
                       src="/project-icon.png"
                       alt="Project"
@@ -304,9 +342,27 @@ export default function ProjectsPage() {
                     </span>
                   </div>
 
-                  <p className="mt-4 text-[15px] text-slate-500">
+                  <p className="mt-2 text-[15px] text-slate-500">
                     Last updated: {timeAgo(project.updated_at)}
                   </p>
+
+                  <div className="mt-4 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/app/projects/${project.id}`)}
+                      className="flex-1 rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-600"
+                    >
+                      Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProject(project.id)}
+                      disabled={deletingProjectId === project.id}
+                      className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deletingProjectId === project.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
