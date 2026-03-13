@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { ChevronDown, Search, X, FolderOpen, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -69,7 +69,7 @@ function timeAgo(dateString: string) {
   return `${Math.floor(diff / 86400)} days ago`;
 }
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -599,5 +599,13 @@ export default function ProjectsPage() {
         </div>
       )}
     </section>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading projects...</div>}>
+      <ProjectsPageContent />
+    </Suspense>
   );
 }
