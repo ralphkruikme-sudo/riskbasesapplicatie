@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { ChevronDown, Search, X, FolderOpen, Trash2 } from "lucide-react";
+import { ChevronDown, Search, X, FolderOpen, Trash2, Plus } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const supabase = createClient(
@@ -32,16 +32,43 @@ type WorkspaceMembership = {
   workspaces: WorkspaceRelation[] | null;
 };
 
+// Generate a consistent color + emoji for each project based on its name
+const PROJECT_COLORS = [
+  { bg: "bg-violet-100", text: "text-violet-700", border: "border-violet-200" },
+  { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
+  { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
+  { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-200" },
+  { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-200" },
+  { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200" },
+  { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
+];
+
+const PROJECT_EMOJIS = ["🏗️", "⚓", "🌊", "🏢", "🔋", "🚢", "🌐", "📡", "🏭", "🛢️", "⚡", "🔩"];
+
+function getProjectStyle(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+  }
+  const colorIndex = Math.abs(hash) % PROJECT_COLORS.length;
+  const emojiIndex = Math.abs(hash >> 3) % PROJECT_EMOJIS.length;
+  return {
+    color: PROJECT_COLORS[colorIndex],
+    emoji: PROJECT_EMOJIS[emojiIndex],
+  };
+}
+
 function getStatusBadge(status: Project["status"]) {
   switch (status) {
     case "high_risk":
-      return "bg-red-100 text-red-600";
+      return "bg-red-100 text-red-600 border border-red-200";
     case "at_risk":
-      return "bg-orange-100 text-orange-600";
+      return "bg-orange-100 text-orange-600 border border-orange-200";
     case "today":
-      return "bg-cyan-100 text-cyan-700";
+      return "bg-cyan-100 text-cyan-700 border border-cyan-200";
     default:
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
   }
 }
 
@@ -58,6 +85,19 @@ function getStatusLabel(status: Project["status"]) {
   }
 }
 
+function getStatusDot(status: Project["status"]) {
+  switch (status) {
+    case "high_risk":
+      return "bg-red-500";
+    case "at_risk":
+      return "bg-orange-500";
+    case "today":
+      return "bg-cyan-500";
+    default:
+      return "bg-emerald-500";
+  }
+}
+
 function timeAgo(dateString: string) {
   const date = new Date(dateString).getTime();
   const now = Date.now();
@@ -67,6 +107,19 @@ function timeAgo(dateString: string) {
   if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)} days ago`;
+}
+
+// Project icon component — emoji-based, no broken images
+function ProjectIcon({ name, size = "lg" }: { name: string; size?: "sm" | "lg" }) {
+  const { color, emoji } = getProjectStyle(name);
+  const dim = size === "lg" ? "h-14 w-14 text-2xl" : "h-10 w-10 text-base";
+  return (
+    <div
+      className={`${dim} ${color.bg} ${color.border} shrink-0 flex items-center justify-center rounded-2xl border font-medium select-none`}
+    >
+      {emoji}
+    </div>
+  );
 }
 
 function ProjectsPageContent() {
@@ -85,9 +138,7 @@ function ProjectsPageContent() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">(
-    "manual"
-  );
+  const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">("manual");
 
   const workspaceFromUrl = searchParams.get("workspace");
 
@@ -343,25 +394,27 @@ function ProjectsPageContent() {
   }, [projects, search]);
 
   return (
-    <section className="flex-1">
-      <div className="border-b border-slate-200 bg-white px-8 py-8">
-        <h1 className="text-[34px] font-semibold tracking-[-0.03em] text-slate-800">
+    <section className="flex-1 bg-[#f7f7fb]">
+      {/* Page header */}
+      <div className="border-b border-slate-200 bg-white px-8 py-7">
+        <h1 className="text-[32px] font-bold tracking-[-0.03em] text-slate-900">
           Projects
         </h1>
-        <p className="mt-2 text-[16px] text-slate-500">
+        <p className="mt-1 text-[15px] text-slate-500">
           Manage all projects in {workspaceName || "this workspace"}
         </p>
       </div>
 
       <div className="px-8 py-6">
+        {/* Toolbar */}
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full max-w-[420px]">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <div className="relative w-full max-w-[400px]">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects..."
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-[15px] text-slate-700 outline-none placeholder:text-slate-400"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             />
           </div>
 
@@ -369,29 +422,33 @@ function ProjectsPageContent() {
             type="button"
             onClick={openCreateProjectModal}
             disabled={!workspaceId}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-500 px-5 text-[16px] font-medium text-white transition hover:bg-violet-600 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-white">
-              <path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z" />
-            </svg>
+            <Plus className="h-4 w-4" />
             Add Project
-            <ChevronDown className="h-4 w-4 text-white/90" />
           </button>
         </div>
 
-        {message ? <p className="mb-4 text-sm text-red-500">{message}</p> : null}
+        {message ? (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            {message}
+          </div>
+        ) : null}
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-[220px] animate-pulse rounded-2xl border border-slate-200 bg-white"
+                className="h-[200px] animate-pulse rounded-2xl border border-slate-200 bg-white"
               />
             ))}
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">
+              🏗️
+            </div>
             <h3 className="text-xl font-semibold text-slate-800">
               No projects yet
             </h3>
@@ -401,93 +458,82 @@ function ProjectsPageContent() {
             <button
               type="button"
               onClick={openCreateProjectModal}
-              className="mt-5 inline-flex h-11 items-center rounded-xl bg-violet-500 px-5 text-white"
+              className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700"
             >
+              <Plus className="h-4 w-4" />
               Create first project
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => (
               <div
                 key={project.id}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-slate-300"
               >
-                <div className="flex items-start gap-4 p-5">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                    <img
-                      src="/project-icon.png"
-                      alt="Project"
-                      className="h-12 w-12 object-contain"
-                    />
-                  </div>
+                {/* Card top */}
+                <div className="flex items-start gap-4 p-5 pb-4">
+                  <ProjectIcon name={project.name} />
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[20px] font-semibold text-slate-800">
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h3 className="truncate text-[18px] font-bold text-slate-900 leading-tight">
                       {project.name}
                     </h3>
+                    <p className="mt-1 text-[13px] text-slate-400">
+                      {timeAgo(project.updated_at)}
+                    </p>
+                  </div>
+                </div>
 
-                    <div className="mt-3 flex items-center gap-2">
-                      <img
-                        src="/avatar.png"
-                        alt="Member"
-                        className="h-8 w-8 rounded-full object-cover"
+                {/* Divider */}
+                <div className="mx-5 border-t border-slate-100" />
+
+                {/* Stats */}
+                <div className="px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[22px] font-bold text-slate-900">
+                        {project.open_risks_count}
+                      </span>
+                      <span className="text-sm text-slate-500">open risks</span>
+                    </div>
+                    <div
+                      className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
+                        project.status
+                      )}`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${getStatusDot(project.status)}`}
                       />
-                      <img
-                        src="/avatar.png"
-                        alt="Member"
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
-                      <img
-                        src="/avatar.png"
-                        alt="Member"
-                        className="h-8 w-8 rounded-full object-cover"
-                      />
+                      {getStatusLabel(project.status)}
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 px-5 py-4">
-                  <div className="flex items-center gap-2 text-[16px] text-slate-700">
-                    <span className="font-semibold">{project.open_risks_count}</span>
-                    <span>Open Risks:</span>
-                    <span
-                      className={`rounded-lg px-2.5 py-1 text-[14px] font-medium ${getStatusBadge(
-                        project.status
-                      )}`}
-                    >
-                      {getStatusLabel(project.status)}
-                    </span>
-                  </div>
+                {/* Actions */}
+                <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/app/projects/${project.id}?workspace=${workspaceId}`
+                      )
+                    }
+                    className="inline-flex flex-1 h-9 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-[0.98]"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Open
+                  </button>
 
-                  <p className="mt-2 text-[15px] text-slate-500">
-                    Last updated: {timeAgo(project.updated_at)}
-                  </p>
-
-                  <div className="mt-5 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/app/projects/${project.id}?workspace=${workspaceId}`
-                        )
-                      }
-                      className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-600"
-                    >
-                      <FolderOpen className="h-4 w-4" />
-                      Open
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProject(project.id)}
-                      disabled={deletingProjectId === project.id}
-                      className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {deletingProjectId === project.id ? "Deleting..." : "Delete"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProject(project.id)}
+                    disabled={deletingProjectId === project.id}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deletingProjectId === project.id ? "..." : "Delete"}
+                  </button>
                 </div>
               </div>
             ))}
@@ -495,60 +541,85 @@ function ProjectsPageContent() {
         )}
       </div>
 
+      {/* ─── CREATE PROJECT MODAL ─── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
-          <div className="w-full max-w-[560px] rounded-2xl border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.20)]">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-2xl font-semibold text-slate-800">
-                Intake Project
-              </h3>
-
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeCreateProjectModal();
+          }}
+        >
+          <div className="w-full max-w-[520px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  New Project
+                </h3>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Set up your project in seconds
+                </p>
+              </div>
               <button
                 onClick={closeCreateProjectModal}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-5 px-6 py-6">
+              {/* Project name */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                   Project name
                 </label>
                 <input
                   type="text"
-                  placeholder="Offshore Windfarm"
+                  placeholder="e.g. Offshore Windfarm Rotterdam"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                  autoFocus
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
                 />
+                {/* Preview icon */}
+                {projectName.trim() && (
+                  <div className="mt-3 flex items-center gap-3">
+                    <ProjectIcon name={projectName.trim()} size="sm" />
+                    <span className="text-sm text-slate-500">
+                      Project icon preview
+                    </span>
+                  </div>
+                )}
               </div>
 
+              {/* Intake method */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Selected method
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  How do you want to add risks?
                 </label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-3">
                   {[
                     {
                       value: "manual",
                       label: "Manual",
-                      icon: "/method-manual.png",
+                      emoji: "✍️",
+                      desc: "Enter risks one by one",
                     },
                     {
                       value: "csv",
-                      label: "CSV",
-                      icon: "/method-csv.png",
+                      label: "CSV Import",
+                      emoji: "📄",
+                      desc: "Upload a spreadsheet",
                     },
                     {
                       value: "api",
                       label: "API",
-                      icon: "/method-api.png",
+                      emoji: "🔌",
+                      desc: "Connect via API",
                     },
                   ].map((option) => {
                     const active = intakeMethod === option.value;
-
                     return (
                       <button
                         key={option.value}
@@ -556,43 +627,53 @@ function ProjectsPageContent() {
                         onClick={() =>
                           setIntakeMethod(option.value as "manual" | "csv" | "api")
                         }
-                        className={`flex flex-col items-center justify-center rounded-xl border px-4 py-4 transition ${
+                        className={`flex flex-col items-center rounded-xl border p-4 text-center transition ${
                           active
-                            ? "border-violet-400 bg-violet-50"
-                            : "border-slate-200 bg-white hover:border-slate-300"
+                            ? "border-violet-400 bg-violet-50 shadow-sm"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                         }`}
                       >
-                        <img
-                          src={option.icon}
-                          alt={option.label}
-                          className="h-10 w-10 object-contain"
-                        />
-                        <span className="mt-3 text-sm font-medium text-slate-700">
+                        <span className="text-2xl">{option.emoji}</span>
+                        <span
+                          className={`mt-2 text-sm font-semibold ${
+                            active ? "text-violet-700" : "text-slate-700"
+                          }`}
+                        >
                           {option.label}
+                        </span>
+                        <span className="mt-0.5 text-[11px] text-slate-400 leading-tight">
+                          {option.desc}
                         </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              {message && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                  {message}
+                </p>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
               <button
                 type="button"
                 onClick={closeCreateProjectModal}
-                className="rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
-                Close
+                Cancel
               </button>
 
               <button
                 type="button"
                 onClick={handleCreateProject}
-                disabled={creatingProject}
-                className="rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:opacity-60"
+                disabled={creatingProject || !projectName.trim()}
+                className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
               >
-                {creatingProject ? "Creating..." : "Create"}
+                {creatingProject ? "Creating..." : "Create Project →"}
               </button>
             </div>
           </div>
@@ -604,7 +685,7 @@ function ProjectsPageContent() {
 
 export default function ProjectsPage() {
   return (
-    <Suspense fallback={<div className="p-8">Loading projects...</div>}>
+    <Suspense fallback={<div className="p-8 text-slate-500">Loading projects...</div>}>
       <ProjectsPageContent />
     </Suspense>
   );
