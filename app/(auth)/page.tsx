@@ -121,6 +121,17 @@ export default function AuthPage() {
     if (error) setMessage(error.message);
   }
 
+  async function handleAppleAuth() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) setMessage(error.message);
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 p-3 sm:p-4 lg:p-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1240px] items-center justify-center">
@@ -151,12 +162,7 @@ export default function AuthPage() {
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                     aria-label="Continue with Google"
                   >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5">
-                      <path
-                        fill="#EA4335"
-                        d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.8-6-6.2s2.7-6.2 6-6.2c1.9 0 3.2.8 3.9 1.5l2.6-2.6C16.8 2.8 14.6 2 12 2 6.9 2 2.8 6.3 2.8 11.5S6.9 21 12 21c6.9 0 8.6-4.8 8.6-7.3 0-.5 0-.9-.1-1.3H12Z"
-                      />
-                    </svg>
+                    <img src="/google.png" alt="Google" className="h-5 w-5 object-contain" />
                   </button>
 
                   <button
@@ -165,12 +171,16 @@ export default function AuthPage() {
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                     aria-label="Continue with Microsoft"
                   >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5">
-                      <rect x="3" y="3" width="8" height="8" fill="#F25022" />
-                      <rect x="13" y="3" width="8" height="8" fill="#7FBA00" />
-                      <rect x="3" y="13" width="8" height="8" fill="#00A4EF" />
-                      <rect x="13" y="13" width="8" height="8" fill="#FFB900" />
-                    </svg>
+                    <img src="/microsoft.png" alt="Microsoft" className="h-5 w-5 object-contain" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAppleAuth}
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
+                    aria-label="Continue with Apple"
+                  >
+                    <img src="/apple.png" alt="Apple" className="h-5 w-5 object-contain" />
                   </button>
                 </div>
 

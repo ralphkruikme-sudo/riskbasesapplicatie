@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -9,12 +10,12 @@ import {
   BarChart3,
   ClipboardList,
   FileText,
-  Search,
   Settings,
   ShieldAlert,
   Users,
   CheckSquare,
   ChevronDown,
+  LogOut,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -35,6 +36,7 @@ type Profile = {
 
 function getStatusLabel(status: string | null) {
   if (!status) return "Draft";
+
   switch (status) {
     case "active":
       return "Active";
@@ -73,6 +75,7 @@ export default function ProjectLayout({
   const [project, setProject] = useState<Project | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     async function loadShellData() {
@@ -116,6 +119,16 @@ export default function ProjectLayout({
     }
   }, [projectId, router]);
 
+  async function handleLogout() {
+    try {
+      setLoggingOut(true);
+      await supabase.auth.signOut();
+      router.push("/auth");
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   const navItems = useMemo(
     () => [
       {
@@ -154,9 +167,9 @@ export default function ProjectLayout({
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-slate-50">
-        <div className="w-[280px] border-r border-slate-200 bg-[#182B63]" />
-        <div className="flex-1 p-10">
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        <div className="h-screen w-64 shrink-0 border-r border-white/10 bg-[#182B63]" />
+        <div className="flex-1 overflow-hidden p-8">
           <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
             Loading project workspace...
           </div>
@@ -166,31 +179,42 @@ export default function ProjectLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="flex w-[280px] flex-col border-r border-white/10 bg-[#182B63] text-white">
-        <div className="border-b border-white/10 px-8 py-8">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
+      <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-[#182B63] text-white">
+        <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
-              <div className="h-6 w-6 rotate-45 rounded-md bg-gradient-to-br from-violet-300 to-blue-300" />
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
+              <Image
+                src="/applogo.png"
+                alt="RiskBases logo"
+                fill
+                className="object-contain p-1.5"
+                sizes="44px"
+                priority
+              />
             </div>
-            <div>
-              <p className="text-[18px] font-semibold tracking-tight">RiskBases</p>
+
+            <div className="min-w-0">
+              <p className="truncate text-[18px] font-semibold tracking-tight text-white">
+                RiskBases
+              </p>
+              <p className="text-xs text-white/50">Project workspace</p>
             </div>
           </div>
         </div>
 
-        <div className="px-4 py-5">
+        <div className="px-3 py-4">
           <Link
             href="/app"
             className="flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] text-white/90 transition hover:bg-white/10"
           >
-            <ArrowLeft className="h-5 w-5" />
-            Back to Workspace
+            <ArrowLeft className="h-5 w-5 shrink-0" />
+            <span className="truncate">Back to Workspace</span>
           </Link>
         </div>
 
-        <nav className="flex-1 px-4">
-          <div className="space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 pb-4">
+          <div className="space-y-1.5">
             {navItems.map((item) => {
               const active = pathname === item.href;
               const Icon = item.icon;
@@ -199,43 +223,59 @@ export default function ProjectLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] transition ${
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium transition ${
                     active
-                      ? "bg-white/12 text-white"
-                      : "text-white/80 hover:bg-white/8 hover:text-white"
+                      ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+                      : "text-white/75 hover:bg-white/8 hover:text-white"
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
           </div>
         </nav>
 
-        <div className="p-4">
-          <Link
-            href={`/app/projects/${projectId}/settings`}
-            className="flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] text-white/80 transition hover:bg-white/8 hover:text-white"
-          >
-            <Settings className="h-5 w-5" />
-            Settings
-          </Link>
+        <div className="mt-auto border-t border-white/10 px-3 py-4">
+          <div className="space-y-1.5">
+            <Link
+              href={`/app/projects/${projectId}/settings`}
+              className="flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium text-white/75 transition hover:bg-white/8 hover:text-white"
+            >
+              <Settings className="h-5 w-5 shrink-0" />
+              <span className="truncate">Settings</span>
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] font-medium text-white/75 transition hover:bg-white/8 hover:text-white disabled:opacity-60"
+            >
+              <LogOut className="h-5 w-5 shrink-0" />
+              <span className="truncate">
+                {loggingOut ? "Logging out..." : "Log out"}
+              </span>
+            </button>
+          </div>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="flex items-center justify-between gap-6 px-8 py-5">
             <div className="min-w-0">
               <div className="flex items-center gap-3 text-[15px] text-slate-500">
                 <Link href="/app" className="hover:text-slate-700">
                   Workspace
                 </Link>
+
                 <span>/</span>
+
                 <span className="truncate font-medium text-slate-800">
                   {project?.name}
                 </span>
+
                 <span
                   className={`rounded-xl px-3 py-1 text-sm font-medium ${getStatusClasses(
                     project?.status ?? null
@@ -243,20 +283,13 @@ export default function ProjectLayout({
                 >
                   {getStatusLabel(project?.status ?? null)}
                 </span>
+
                 <ChevronDown className="h-4 w-4 text-slate-400" />
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="relative hidden w-[280px] lg:block">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  placeholder="Search projects..."
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-[15px] text-slate-700 outline-none placeholder:text-slate-400"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
                 {profile?.avatar_url ? (
                   <img
                     src={profile.avatar_url}
@@ -265,9 +298,7 @@ export default function ProjectLayout({
                   />
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700">
-                    {(profile?.full_name || "R")
-                      .slice(0, 1)
-                      .toUpperCase()}
+                    {(profile?.full_name || "R").slice(0, 1).toUpperCase()}
                   </div>
                 )}
 
@@ -283,7 +314,7 @@ export default function ProjectLayout({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

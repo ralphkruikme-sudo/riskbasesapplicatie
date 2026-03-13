@@ -11,6 +11,7 @@ import {
   Settings,
   Users,
   X,
+  ChevronDown as ChevronDownSmall,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -40,6 +41,50 @@ type TeamMember = {
 
 type ModalType = "team" | "billing" | "settings" | null;
 
+const ROLES = ["owner", "co-owner", "worker"] as const;
+type Role = (typeof ROLES)[number];
+
+const ROLE_COLORS: Record<string, string> = {
+  owner: "bg-violet-100 text-violet-700",
+  "co-owner": "bg-blue-100 text-blue-700",
+  worker: "bg-slate-100 text-slate-600",
+};
+
+function getInitials(name: string | null): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?";
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function AvatarCircle({
+  name,
+  avatarUrl,
+  size = "md",
+}: {
+  name: string | null;
+  avatarUrl: string | null;
+  size?: "sm" | "md";
+}) {
+  const dim = size === "sm" ? "h-9 w-9 text-xs" : "h-11 w-11 text-sm";
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || "Member"}
+        className={`${dim} rounded-full object-cover shrink-0`}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${dim} flex shrink-0 items-center justify-center rounded-full bg-violet-500 font-semibold text-white`}
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
 export default function WorkflowLayout({
   children,
 }: {
@@ -53,11 +98,15 @@ export default function WorkflowLayout({
   const [expanded, setExpanded] = useState(false);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [modal, setModal] = useState<ModalType>(null);
   const [loading, setLoading] = useState(true);
   const [teamLoading, setTeamLoading] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState<string | null>(null);
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadShellData() {
@@ -72,9 +121,11 @@ export default function WorkflowLayout({
           return;
         }
 
+        setCurrentUserId(user.id);
+
         const { data: membership, error: membershipError } = await supabase
           .from("workspace_members")
-          .select("workspace_id")
+          .select("workspace_id, role")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -82,6 +133,8 @@ export default function WorkflowLayout({
           router.push("/onboarding");
           return;
         }
+
+        setCurrentUserRole(membership.role);
 
         const { data: workspaceData, error: workspaceError } = await supabase
           .from("workspaces")
@@ -132,7 +185,7 @@ export default function WorkflowLayout({
 
         const userIds = (membersData ?? []).map((m) => m.user_id);
 
-        let profilesMap = new Map<string, Profile>();
+        let profilesMap = new Map<string, { full_name: string | null; avatar_url: string | null }>();
 
         if (userIds.length > 0) {
           const { data: profilesData } = await supabase
@@ -143,10 +196,7 @@ export default function WorkflowLayout({
           profilesMap = new Map(
             (profilesData ?? []).map((p: any) => [
               p.id,
-              {
-                full_name: p.full_name,
-                avatar_url: p.avatar_url,
-              },
+              { full_name: p.full_name, avatar_url: p.avatar_url },
             ])
           );
         }
@@ -154,7 +204,7 @@ export default function WorkflowLayout({
         const merged = (membersData ?? []).map((member) => ({
           user_id: member.user_id,
           role: member.role,
-          full_name: profilesMap.get(member.user_id)?.full_name || "Team member",
+          full_name: profilesMap.get(member.user_id)?.full_name || null,
           avatar_url: profilesMap.get(member.user_id)?.avatar_url || null,
         }));
 
@@ -180,6 +230,8 @@ export default function WorkflowLayout({
     return profile?.full_name || "User";
   }, [profile]);
 
+  const isOwner = currentUserRole === "owner";
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/");
@@ -187,14 +239,34 @@ export default function WorkflowLayout({
 
   async function copyWorkspaceKey() {
     if (!workspace?.join_key) return;
-
     try {
       await navigator.clipboard.writeText(workspace.join_key);
-      setCopyMessage("Workspace key copied");
+      setCopyMessage("Workspace key gekopieerd");
       setTimeout(() => setCopyMessage(""), 2000);
     } catch {
-      setCopyMessage("Could not copy key");
+      setCopyMessage("Kon key niet kopiëren");
       setTimeout(() => setCopyMessage(""), 2000);
+    }
+  }
+
+  async function handleRoleChange(userId: string, newRole: Role) {
+    if (!workspace?.id) return;
+    setRoleUpdating(userId);
+    setRoleDropdownOpen(null);
+    try {
+      const { error } = await supabase
+        .from("workspace_members")
+        .update({ role: newRole })
+        .eq("workspace_id", workspace.id)
+        .eq("user_id", userId);
+
+      if (!error) {
+        setTeamMembers((prev) =>
+          prev.map((m) => (m.user_id === userId ? { ...m, role: newRole } : m))
+        );
+      }
+    } finally {
+      setRoleUpdating(null);
     }
   }
 
@@ -263,7 +335,6 @@ export default function WorkflowLayout({
           <nav className="flex flex-1 flex-col gap-2 px-3 py-4">
             {navItems.map((item) => {
               const Icon = item.icon;
-
               return (
                 <button
                   key={item.key}
@@ -323,23 +394,11 @@ export default function WorkflowLayout({
 
             <div className="flex items-center gap-3">
               <button className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-slate-50">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={displayName}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 text-sm font-semibold text-white">
-                    {displayName
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </div>
-                )}
-
+                <AvatarCircle
+                  name={displayName}
+                  avatarUrl={profile?.avatar_url ?? null}
+                  size="sm"
+                />
                 <span className="hidden text-[17px] font-medium text-slate-700 sm:block">
                   {displayName}
                 </span>
@@ -352,16 +411,23 @@ export default function WorkflowLayout({
         </div>
       </div>
 
+      {/* MODALS */}
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModal(null);
+            setRoleDropdownOpen(null);
+          }}
+        >
           <div className="w-full max-w-[620px] rounded-2xl border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.20)]">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h3 className="text-2xl font-semibold text-slate-800">
                 {modal === "team" && "Team"}
                 {modal === "billing" && "Billing"}
                 {modal === "settings" && "Settings"}
               </h3>
-
               <button
                 onClick={() => setModal(null)}
                 className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
@@ -370,18 +436,19 @@ export default function WorkflowLayout({
               </button>
             </div>
 
+            {/* Body */}
             <div className="px-6 py-6">
               {modal === "team" && (
                 <div className="space-y-6">
+                  {/* Workspace key */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-sm font-medium text-slate-700">
                       Workspace key
                     </p>
                     <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[15px] font-medium tracking-[0.15em] text-slate-700">
-                        {workspace?.join_key || "No key"}
+                        {workspace?.join_key || "Geen key"}
                       </div>
-
                       <button
                         onClick={copyWorkspaceKey}
                         className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-600"
@@ -390,79 +457,131 @@ export default function WorkflowLayout({
                         Copy key
                       </button>
                     </div>
-
                     <p className="mt-3 text-sm text-slate-500">
-                      Share this workspace key with colleagues so they can join
-                      from the onboarding page.
+                      Deel deze workspace key met collega's zodat ze kunnen joinen via de onboarding pagina.
                     </p>
-
-                    {copyMessage ? (
-                      <p className="mt-2 text-sm text-emerald-600">
-                        {copyMessage}
-                      </p>
-                    ) : null}
+                    {copyMessage && (
+                      <p className="mt-2 text-sm text-emerald-600">{copyMessage}</p>
+                    )}
                   </div>
 
+                  {/* Team members */}
                   <div>
-                    <h4 className="text-lg font-semibold text-slate-800">
-                      Team members
-                    </h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-slate-800">
+                        Team members
+                      </h4>
+                      <span className="text-sm text-slate-400">
+                        {teamMembers.length} {teamMembers.length === 1 ? "persoon" : "personen"}
+                      </span>
+                    </div>
 
-                    <div className="mt-4 space-y-3">
+                    <div className="space-y-2">
                       {teamLoading ? (
-                        <div className="space-y-3">
-                          {Array.from({ length: 3 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="h-16 animate-pulse rounded-xl border border-slate-200 bg-slate-50"
-                            />
-                          ))}
-                        </div>
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="h-16 animate-pulse rounded-xl border border-slate-200 bg-slate-50"
+                          />
+                        ))
                       ) : teamMembers.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-slate-500">
-                          No team members found yet.
+                          Nog geen teamleden gevonden.
                         </div>
                       ) : (
-                        teamMembers.map((member) => (
-                          <div
-                            key={member.user_id}
-                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              {member.avatar_url ? (
-                                <img
-                                  src={member.avatar_url}
-                                  alt={member.full_name || "Member"}
-                                  className="h-11 w-11 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-500 text-sm font-semibold text-white">
-                                  {(member.full_name || "TM")
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .slice(0, 2)
-                                    .join("")
-                                    .toUpperCase()}
-                                </div>
-                              )}
+                        teamMembers.map((member) => {
+                          const isMe = member.user_id === currentUserId;
+                          const canEdit = isOwner && !isMe;
+                          const roleBadge =
+                            ROLE_COLORS[member.role] ?? "bg-slate-100 text-slate-600";
 
-                              <div>
-                                <p className="text-[15px] font-medium text-slate-800">
-                                  {member.full_name || "Team member"}
-                                </p>
-                                <p className="text-sm capitalize text-slate-500">
-                                  {member.role}
-                                </p>
+                          return (
+                            <div
+                              key={member.user_id}
+                              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
+                            >
+                              {/* Avatar + name */}
+                              <div className="flex items-center gap-3 min-w-0">
+                                <AvatarCircle
+                                  name={member.full_name}
+                                  avatarUrl={member.avatar_url}
+                                  size="md"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-[15px] font-medium text-slate-800 truncate">
+                                    {member.full_name || "Onbekend lid"}
+                                    {isMe && (
+                                      <span className="ml-2 text-xs text-slate-400 font-normal">
+                                        (jij)
+                                      </span>
+                                    )}
+                                  </p>
+                                  <p className="text-sm capitalize text-slate-500">
+                                    {member.role}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Role badge / dropdown */}
+                              <div className="relative ml-3 shrink-0">
+                                {canEdit ? (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        setRoleDropdownOpen(
+                                          roleDropdownOpen === member.user_id
+                                            ? null
+                                            : member.user_id
+                                        )
+                                      }
+                                      disabled={roleUpdating === member.user_id}
+                                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition hover:opacity-80 ${roleBadge}`}
+                                    >
+                                      {roleUpdating === member.user_id
+                                        ? "..."
+                                        : member.role}
+                                      <ChevronDownSmall className="h-3 w-3" />
+                                    </button>
+
+                                    {roleDropdownOpen === member.user_id && (
+                                      <div className="absolute right-0 top-full z-10 mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                                        {ROLES.map((r) => (
+                                          <button
+                                            key={r}
+                                            onClick={() =>
+                                              handleRoleChange(member.user_id, r)
+                                            }
+                                            className={`flex w-full items-center px-4 py-2.5 text-sm capitalize transition hover:bg-slate-50 ${
+                                              member.role === r
+                                                ? "font-semibold text-violet-600"
+                                                : "text-slate-700"
+                                            }`}
+                                          >
+                                            {r}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${roleBadge}`}
+                                  >
+                                    {member.role}
+                                  </span>
+                                )}
                               </div>
                             </div>
-
-                            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-600">
-                              {member.role}
-                            </span>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
+
+                    {isOwner && (
+                      <p className="mt-3 text-xs text-slate-400">
+                        Als owner kun je rollen wijzigen door op de badge te klikken.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -473,8 +592,7 @@ export default function WorkflowLayout({
                     Billing komt hier straks.
                   </p>
                   <p className="mt-3 text-sm text-slate-400">
-                    Hier kun je later subscription, plan, facturen en usage
-                    tonen.
+                    Hier kun je later subscription, plan, facturen en usage tonen.
                   </p>
                 </>
               )}
@@ -491,6 +609,7 @@ export default function WorkflowLayout({
               )}
             </div>
 
+            {/* Footer */}
             <div className="flex justify-end border-t border-slate-200 px-6 py-4">
               <button
                 onClick={() => setModal(null)}
