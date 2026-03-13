@@ -64,8 +64,9 @@ export default function Step7Page() {
       if (data.selected_risk_categories) {
         const parsed = data.selected_risk_categories
           .split(",")
-          .map((item) => item.trim())
+          .map((item: string) => item.trim()) // FIX
           .filter(Boolean);
+
         setSelectedCategories(parsed);
       }
 
@@ -220,6 +221,7 @@ export default function Step7Page() {
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Initial risks
             </label>
+
             <textarea
               value={initialRisks}
               onChange={(e) => setInitialRisks(e.target.value)}
@@ -232,6 +234,7 @@ export default function Step7Page() {
 - Local stakeholder resistance`}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-violet-400 focus:bg-white"
             />
+
             <p className="mt-2 text-xs text-slate-400">
               Add rough notes, bullet points or short risk ideas. This can later feed the risk register.
             </p>
@@ -239,7 +242,9 @@ export default function Step7Page() {
 
           <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
             <button
-              onClick={() => router.push(`/app/projects/${projectId}/intake/step-6`)}
+              onClick={() =>
+                router.push(`/app/projects/${projectId}/intake/step-6`)
+              }
               className="rounded-xl border border-slate-200 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50"
             >
               Back
