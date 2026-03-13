@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { ChevronDown, Search, X, FolderOpen, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,6 +17,19 @@ type Project = {
   open_risks_count: number;
   updated_at: string;
   intake_method: "manual" | "csv" | "api" | null;
+};
+
+type WorkspaceRelation = {
+  id: string;
+  name: string | null;
+  company_name: string | null;
+  join_key: string | null;
+};
+
+type WorkspaceMembership = {
+  workspace_id: string;
+  role: string | null;
+  workspaces: WorkspaceRelation[] | null;
 };
 
 function getStatusBadge(status: Project["status"]) {
@@ -58,12 +71,15 @@ function timeAgo(dateString: string) {
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingProject, setCreatingProject] = useState(false);
   const [message, setMessage] = useState("");
+
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState<string>("");
   const [search, setSearch] = useState("");
 
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
@@ -72,6 +88,8 @@ export default function ProjectsPage() {
   const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">(
     "manual"
   );
+
+  const workspaceFromUrl = searchParams.get("workspace");
 
   useEffect(() => {
     async function loadProjects() {
@@ -89,27 +107,95 @@ export default function ProjectsPage() {
           return;
         }
 
-        const { data: membership, error: membershipError } = await supabase
+        const { data: memberships, error: membershipsError } = await supabase
           .from("workspace_members")
-          .select("workspace_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .select(
+            `
+            workspace_id,
+            role,
+            workspaces (
+              id,
+              name,
+              company_name,
+              join_key
+            )
+            `
+          )
+          .eq("user_id", user.id);
 
-        if (membershipError || !membership?.workspace_id) {
+        if (membershipsError) throw membershipsError;
+
+        const membershipList = (memberships ?? []) as unknown as WorkspaceMembership[];
+
+        if (membershipList.length === 0) {
           router.push("/onboarding");
           return;
         }
 
-        setWorkspaceId(membership.workspace_id);
+        const localStorageWorkspaceId =
+          typeof window !== "undefined"
+            ? localStorage.getItem("active_workspace_id")
+            : null;
+
+        const requestedWorkspaceId =
+          workspaceFromUrl || localStorageWorkspaceId || null;
+
+        let activeMembership: WorkspaceMembership | null = null;
+
+        if (requestedWorkspaceId) {
+          activeMembership =
+            membershipList.find(
+              (membership) => membership.workspace_id === requestedWorkspaceId
+            ) ?? null;
+        }
+
+        if (!activeMembership) {
+          activeMembership = membershipList[0];
+        }
+
+        if (!activeMembership?.workspace_id) {
+          router.push("/onboarding");
+          return;
+        }
+
+        const activeWorkspace = activeMembership.workspaces?.[0] ?? null;
+
+        setWorkspaceId(activeMembership.workspace_id);
+        setWorkspaceName(
+          activeWorkspace?.name ||
+            activeWorkspace?.company_name ||
+            "Workspace"
+        );
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem("active_workspace_id", activeMembership.workspace_id);
+
+          if (activeWorkspace) {
+            localStorage.setItem(
+              "active_workspace",
+              JSON.stringify({
+                id: activeWorkspace.id,
+                name: activeWorkspace.name ?? "",
+                company_name: activeWorkspace.company_name ?? "",
+                join_key: activeWorkspace.join_key ?? "",
+              })
+            );
+          }
+        }
+
+        if (workspaceFromUrl !== activeMembership.workspace_id) {
+          router.replace(`/app?workspace=${activeMembership.workspace_id}`);
+        }
 
         const { data: projectsData, error: projectsError } = await supabase
           .from("projects")
           .select("id, name, status, open_risks_count, updated_at, intake_method")
-          .eq("workspace_id", membership.workspace_id)
+          .eq("workspace_id", activeMembership.workspace_id)
           .order("updated_at", { ascending: false });
 
         if (projectsError) throw projectsError;
-        setProjects(projectsData ?? []);
+
+        setProjects((projectsData ?? []) as Project[]);
       } catch (error: any) {
         setMessage(error?.message || "Could not load projects.");
       } finally {
@@ -118,7 +204,7 @@ export default function ProjectsPage() {
     }
 
     loadProjects();
-  }, [router]);
+  }, [router, workspaceFromUrl]);
 
   function openCreateProjectModal() {
     setMessage("");
@@ -147,9 +233,10 @@ export default function ProjectsPage() {
 
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No user found.");
+      if (userError || !user) throw new Error("No user found.");
 
       const { data: project, error: projectError } = await supabase
         .from("projects")
@@ -165,6 +252,7 @@ export default function ProjectsPage() {
         .single();
 
       if (projectError) throw projectError;
+      if (!project) throw new Error("Project could not be created.");
 
       const { error: memberError } = await supabase
         .from("project_members")
@@ -176,7 +264,7 @@ export default function ProjectsPage() {
 
       if (memberError) throw memberError;
 
-      setProjects((prev) => [project, ...prev]);
+      setProjects((prev) => [project as Project, ...prev]);
       setShowCreateModal(false);
 
       if (intakeMethod === "manual") {
@@ -211,19 +299,11 @@ export default function ProjectsPage() {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) throw new Error("No user found.");
-
-      const { data: membership, error: membershipError } = await supabase
-        .from("workspace_members")
-        .select("workspace_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (membershipError || !membership?.workspace_id) {
-        throw new Error("No workspace membership found.");
-      }
+      if (userError || !user) throw new Error("No user found.");
+      if (!workspaceId) throw new Error("No active workspace selected.");
 
       const { error: membersDeleteError } = await supabase
         .from("project_members")
@@ -236,7 +316,7 @@ export default function ProjectsPage() {
         .from("projects")
         .delete()
         .eq("id", projectId)
-        .eq("workspace_id", membership.workspace_id)
+        .eq("workspace_id", workspaceId)
         .select("id");
 
       if (projectDeleteError) throw projectDeleteError;
@@ -256,9 +336,11 @@ export default function ProjectsPage() {
     }
   }
 
-  const filteredProjects = projects.filter((project) =>
-    project.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) =>
+      project.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [projects, search]);
 
   return (
     <section className="flex-1">
@@ -267,7 +349,7 @@ export default function ProjectsPage() {
           Projects
         </h1>
         <p className="mt-2 text-[16px] text-slate-500">
-          Manage all projects in this workspace
+          Manage all projects in {workspaceName || "this workspace"}
         </p>
       </div>
 
@@ -385,7 +467,11 @@ export default function ProjectsPage() {
                   <div className="mt-5 flex items-center justify-between gap-3">
                     <button
                       type="button"
-                      onClick={() => router.push(`/app/projects/${project.id}`)}
+                      onClick={() =>
+                        router.push(
+                          `/app/projects/${project.id}?workspace=${workspaceId}`
+                        )
+                      }
                       className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-500 px-4 text-sm font-semibold text-white transition hover:bg-violet-600"
                     >
                       <FolderOpen className="h-4 w-4" />

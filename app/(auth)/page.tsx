@@ -15,7 +15,7 @@ type Mode = "login" | "signup";
 export default function AuthPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<Mode>("signup");
+  const [mode, setMode] = useState<Mode>("login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -177,7 +177,7 @@ export default function AuthPage() {
                 <div className="mt-6 flex items-center gap-3">
                   <div className="h-px flex-1 bg-slate-200" />
                   <span className="whitespace-nowrap text-xs text-slate-400 sm:text-sm">
-                    {isLogin ? "or log in via email" : "or do via email"}
+                    {isLogin ? "or log in via email" : "or sign up via email"}
                   </span>
                   <div className="h-px flex-1 bg-slate-200" />
                 </div>

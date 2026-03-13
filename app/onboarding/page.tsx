@@ -42,42 +42,59 @@ export default function OnboardingPage() {
 
       if (!trimmedKey) throw new Error("Voer een workspace key in.");
 
-      // Find workspace by join_key
+      // Zoek workspace op join_key
       const { data: workspace, error: workspaceError } = await supabase
         .from("workspaces")
-        .select("id, join_key")
+        .select("id, name, join_key")
         .eq("join_key", trimmedKey)
         .maybeSingle();
 
       if (workspaceError) throw workspaceError;
-      if (!workspace) throw new Error("Workspace key niet gevonden. Controleer de key en probeer opnieuw.");
+      if (!workspace) {
+        throw new Error(
+          "Workspace key niet gevonden. Controleer de key en probeer opnieuw."
+        );
+      }
 
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
+      // Check of gebruiker al lid is
+      const { data: existingMember, error: existingMemberError } = await supabase
         .from("workspace_members")
-        .select("id")
+        .select("id, workspace_id")
         .eq("workspace_id", workspace.id)
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (existingMember) {
-        // Already a member, just redirect
-        router.push("/app");
-        return;
+      if (existingMemberError) throw existingMemberError;
+
+      // Voeg gebruiker toe als member als dat nog niet zo is
+      if (!existingMember) {
+        const { error: memberError } = await supabase
+          .from("workspace_members")
+          .insert({
+            workspace_id: workspace.id,
+            user_id: user.id,
+            role: "member",
+          });
+
+        if (memberError) throw memberError;
       }
 
-      // Add user as member
-      const { error: memberError } = await supabase
-        .from("workspace_members")
-        .insert({
-          workspace_id: workspace.id,
-          user_id: user.id,
-          role: "member",
-        });
+      // Sla actieve workspace op voor volgende pagina's
+      if (typeof window !== "undefined") {
+        localStorage.setItem("active_workspace_id", workspace.id);
+        localStorage.setItem(
+          "active_workspace",
+          JSON.stringify({
+            id: workspace.id,
+            name: workspace.name ?? "",
+            join_key: workspace.join_key ?? "",
+          })
+        );
+      }
 
-      if (memberError) throw memberError;
-
-      router.push("/app");
+      setWorkspaceKey("");
+      router.push(`/app?workspace=${workspace.id}`);
+      router.refresh();
     } catch (error: any) {
       setMessage(error?.message || "Kon workspace niet joinen.");
     } finally {
@@ -113,7 +130,7 @@ export default function OnboardingPage() {
           join_key: joinKey,
           created_by: user.id,
         })
-        .select("id")
+        .select("id, name, join_key")
         .single();
 
       if (workspaceError) throw workspaceError;
@@ -129,7 +146,24 @@ export default function OnboardingPage() {
 
       if (memberError) throw memberError;
 
-      router.push("/app");
+      if (typeof window !== "undefined") {
+        localStorage.setItem("active_workspace_id", workspace.id);
+        localStorage.setItem(
+          "active_workspace",
+          JSON.stringify({
+            id: workspace.id,
+            name: workspace.name ?? trimmedWorkspaceName,
+            join_key: workspace.join_key ?? joinKey,
+          })
+        );
+      }
+
+      setWorkspaceName("");
+      setCompanyName("");
+      setShowCreateModal(false);
+
+      router.push(`/app?workspace=${workspace.id}`);
+      router.refresh();
     } catch (error: any) {
       setMessage(error?.message || "Kon workspace niet aanmaken.");
     } finally {
@@ -142,9 +176,8 @@ export default function OnboardingPage() {
     setShowCreateModal(false);
   }
 
-  // Allow pressing Enter to submit join
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && workspaceKey.trim()) {
+    if (e.key === "Enter" && workspaceKey.trim() && !loadingJoin) {
       handleJoinWorkspace();
     }
   }
@@ -189,7 +222,7 @@ export default function OnboardingPage() {
                       onKeyDown={handleKeyDown}
                       autoComplete="off"
                       spellCheck={false}
-                      className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                      className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-[15px] uppercase text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
                     />
                   </div>
 
@@ -197,7 +230,7 @@ export default function OnboardingPage() {
                     type="button"
                     onClick={handleJoinWorkspace}
                     disabled={loadingJoin || !workspaceKey.trim()}
-                    className="h-12 rounded-xl bg-violet-400 px-6 text-base font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60 sm:px-8 sm:text-lg"
+                    className="h-12 rounded-xl bg-violet-400 px-6 text-base font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60 sm:px-8 sm:text-lg"
                   >
                     {loadingJoin ? "Joining..." : "Join"}
                   </button>
@@ -242,15 +275,14 @@ export default function OnboardingPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
           <div className="w-full max-w-[560px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.20)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-2xl font-semibold text-slate-800">
-                Create Workspace
+              <h3 className="text-lg font-semibold text-slate-800 sm:text-xl">
+                Create New Workspace
               </h3>
 
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Close modal"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -259,48 +291,53 @@ export default function OnboardingPage() {
             <div className="space-y-5 px-6 py-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Workspace Name
+                  Workspace name
                 </label>
                 <input
                   type="text"
-                  placeholder="RiskBases Main Workspace"
                   value={workspaceName}
                   onChange={(e) => setWorkspaceName(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                  placeholder="e.g. Kruik BV Workspace"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Company Name
+                  Company name
                 </label>
                 <input
                   type="text"
-                  placeholder="Kruik BV"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                  placeholder="e.g. Kruik BV"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-violet-400"
                 />
               </div>
-            </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Close
-              </button>
+              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={loadingCreate}
+                  className="h-12 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
 
-              <button
-                type="button"
-                onClick={handleCreateWorkspace}
-                disabled={loadingCreate}
-                className="rounded-lg bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:opacity-60"
-              >
-                {loadingCreate ? "Creating..." : "Create"}
-              </button>
+                <button
+                  type="button"
+                  onClick={handleCreateWorkspace}
+                  disabled={
+                    loadingCreate ||
+                    !workspaceName.trim() ||
+                    !companyName.trim()
+                  }
+                  className="h-12 rounded-xl bg-violet-400 px-5 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loadingCreate ? "Creating..." : "Create Workspace"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
