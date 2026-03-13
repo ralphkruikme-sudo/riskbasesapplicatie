@@ -136,16 +136,16 @@ export default function AuthPage() {
     <main className="min-h-screen bg-slate-100 p-3 sm:p-4 lg:p-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1240px] items-center justify-center">
         <div className="relative grid w-full overflow-hidden rounded-[24px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] lg:grid-cols-2 lg:min-h-[620px] xl:min-h-[660px]">
-          <div className="absolute left-6 top-6 z-20 sm:left-8 sm:top-8">
+          <div className="absolute left-0 top-6 z-20 px-3 sm:top-8 sm:px-4">
             <img
               src="/logo.svg"
               alt="RiskBases"
-              className="h-9 w-auto object-contain sm:h-10"
+              className="h-24 w-auto object-contain sm:h-28"
             />
           </div>
 
           <section className="flex w-full bg-white">
-            <div className="flex w-full flex-col justify-center px-6 pb-6 pt-20 sm:px-8 sm:pb-8 sm:pt-24 lg:px-10 lg:pb-10 lg:pt-20 xl:px-12">
+            <div className="flex w-full flex-col justify-center px-6 pb-6 pt-32 sm:px-8 sm:pb-8 sm:pt-36 lg:px-10 lg:pb-10 lg:pt-32 xl:px-12">
               <div className="w-full max-w-[430px]">
                 <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-[36px] xl:text-[40px]">
                   {heading}

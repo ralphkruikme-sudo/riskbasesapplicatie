@@ -418,39 +418,67 @@ export default function ActionsPage() {
     setSubmitting(false);
   }
 
-  async function handleCreateAction() {
-    if (!form.title.trim()) {
-      setErrorMessage("Action title is required.");
-      return;
-    }
+async function handleCreateAction() {
+  if (!form.title.trim()) {
+    setErrorMessage("Action title is required.");
+    return;
+  }
 
-    setSubmitting(true);
-    setErrorMessage(null);
+  setSubmitting(true);
+  setErrorMessage(null);
 
-    const payload = {
+  const payload = {
+    project_id: projectId,
+    risk_id: form.risk_id || null,
+    title: form.title.trim(),
+    description: form.description.trim() || null,
+    owner_user_id: form.owner_user_id || null,
+    status: form.status,
+    priority: form.priority,
+    due_date: form.due_date || null,
+    completed_at: form.status === "done" ? new Date().toISOString() : null,
+  };
+
+  const { data: insertedAction, error: actionError } = await supabase
+    .from("risk_actions")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (actionError) {
+    setErrorMessage(actionError.message);
+    setSubmitting(false);
+    return;
+  }
+
+  if (form.owner_user_id && insertedAction) {
+    const linkedRisk = form.risk_id ? riskMap.get(form.risk_id) : null;
+
+    const notificationPayload = {
       project_id: projectId,
       risk_id: form.risk_id || null,
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      owner_user_id: form.owner_user_id || null,
-      status: form.status,
-      priority: form.priority,
-      due_date: form.due_date || null,
-      completed_at: form.status === "done" ? new Date().toISOString() : null,
+      action_id: insertedAction.id,
+      user_id: form.owner_user_id,
+      type: "action_assigned",
+      title: "New action assigned",
+      message: linkedRisk
+        ? `You have been assigned a new action: "${form.title.trim()}" linked to ${linkedRisk.risk_code || "a risk"}.`
+        : `You have been assigned a new action: "${form.title.trim()}".`,
     };
 
-    const { error } = await supabase.from("risk_actions").insert(payload);
+    const { error: notificationError } = await supabase
+      .from("notifications")
+      .insert(notificationPayload);
 
-    if (error) {
-      setErrorMessage(error.message);
-      setSubmitting(false);
-      return;
+    if (notificationError) {
+      console.error("Notification insert failed:", notificationError.message);
     }
-
-    await loadActionsPage();
-    closeCreateModal();
-    resetForm();
   }
+
+  await loadActionsPage();
+  closeCreateModal();
+  resetForm();
+}
 
   return (
     <section className="p-8">

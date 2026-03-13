@@ -16,6 +16,7 @@ import {
   CheckSquare,
   ChevronDown,
   LogOut,
+  Bell,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -76,6 +77,29 @@ export default function ProjectLayout({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  async function loadUnreadNotifications(userId: string) {
+    if (!projectId || !userId) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const { count, error } = await supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("project_id", projectId)
+      .eq("is_read", false);
+
+    if (error) {
+      console.error("Failed to load unread notifications:", error.message);
+      setUnreadCount(0);
+      return;
+    }
+
+    setUnreadCount(count || 0);
+  }
 
   useEffect(() => {
     async function loadShellData() {
@@ -111,6 +135,7 @@ export default function ProjectLayout({
 
       setProject(projectData);
       setProfile(profileData || null);
+      await loadUnreadNotifications(user.id);
       setLoading(false);
     }
 
@@ -289,6 +314,18 @@ export default function ProjectLayout({
             </div>
 
             <div className="flex items-center gap-4">
+              <Link
+                href={`/app/projects/${projectId}/notifications`}
+                className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:bg-slate-50"
+              >
+                <Bell className="h-5 w-5 text-slate-600" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+
               <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
                 {profile?.avatar_url ? (
                   <img
