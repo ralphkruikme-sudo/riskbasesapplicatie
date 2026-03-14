@@ -5,9 +5,9 @@ import { createClient } from "@supabase/supabase-js";
 import {
   AlertTriangle,
   Calendar,
-  ChevronDown,
   Eye,
   Filter,
+  Link2,
   Loader2,
   Plus,
   RefreshCw,
@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   User2,
+  Users,
   X,
 } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -59,6 +60,49 @@ type ProfileOption = {
   avatar_url: string | null;
 };
 
+type StakeholderType =
+  | "client"
+  | "government"
+  | "contractor"
+  | "subcontractor"
+  | "supplier"
+  | "utility"
+  | "internal"
+  | "community"
+  | "consultant"
+  | "other";
+
+type StakeholderOption = {
+  id: string;
+  project_id: string;
+  name: string;
+  organization: string | null;
+  role: string | null;
+  stakeholder_type: StakeholderType | null;
+  email: string | null;
+  phone: string | null;
+  influence_score: number;
+  interest_score: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type RiskStakeholderLink = {
+  id: string;
+  risk_id: string;
+  stakeholder_id: string;
+  relationship_type:
+    | "owner"
+    | "influencer"
+    | "affected"
+    | "approver"
+    | "reviewer"
+    | "external_party";
+  notes: string | null;
+  created_at: string;
+};
+
 type RiskFormState = {
   title: string;
   description: string;
@@ -75,6 +119,18 @@ type RiskFormState = {
   due_review_date: string;
 };
 
+type LinkStakeholderForm = {
+  stakeholder_id: string;
+  relationship_type:
+    | "owner"
+    | "influencer"
+    | "affected"
+    | "approver"
+    | "reviewer"
+    | "external_party";
+  notes: string;
+};
+
 const defaultFormState: RiskFormState = {
   title: "",
   description: "",
@@ -89,6 +145,12 @@ const defaultFormState: RiskFormState = {
   owner_user_id: "",
   phase: "",
   due_review_date: "",
+};
+
+const defaultLinkStakeholderForm: LinkStakeholderForm = {
+  stakeholder_id: "",
+  relationship_type: "affected",
+  notes: "",
 };
 
 const categoryOptions = [
@@ -124,6 +186,15 @@ const statusOptions: RiskStatus[] = [
   "archived",
 ];
 
+const relationshipTypeOptions: LinkStakeholderForm["relationship_type"][] = [
+  "owner",
+  "influencer",
+  "affected",
+  "approver",
+  "reviewer",
+  "external_party",
+];
+
 function formatStatusLabel(value: RiskStatus) {
   switch (value) {
     case "open":
@@ -141,13 +212,59 @@ function formatStatusLabel(value: RiskStatus) {
   }
 }
 
+function formatRelationshipLabel(
+  value: LinkStakeholderForm["relationship_type"]
+) {
+  switch (value) {
+    case "owner":
+      return "Owner";
+    case "influencer":
+      return "Influencer";
+    case "affected":
+      return "Affected";
+    case "approver":
+      return "Approver";
+    case "reviewer":
+      return "Reviewer";
+    case "external_party":
+      return "External Party";
+    default:
+      return value;
+  }
+}
+
+function formatStakeholderTypeLabel(value: StakeholderType | null) {
+  if (!value) return "Unspecified";
+
+  switch (value) {
+    case "client":
+      return "Client";
+    case "government":
+      return "Government";
+    case "contractor":
+      return "Contractor";
+    case "subcontractor":
+      return "Subcontractor";
+    case "supplier":
+      return "Supplier";
+    case "utility":
+      return "Utility";
+    case "internal":
+      return "Internal";
+    case "community":
+      return "Community";
+    case "consultant":
+      return "Consultant";
+    case "other":
+      return "Other";
+    default:
+      return value;
+  }
+}
+
 function getLevelClasses(level: RiskLevel | null | undefined) {
-  if (level === "high") {
-    return "bg-red-50 text-red-700 border-red-200";
-  }
-  if (level === "medium") {
-    return "bg-amber-50 text-amber-700 border-amber-200";
-  }
+  if (level === "high") return "bg-red-50 text-red-700 border-red-200";
+  if (level === "medium") return "bg-amber-50 text-amber-700 border-amber-200";
   return "bg-blue-50 text-blue-700 border-blue-200";
 }
 
@@ -163,6 +280,26 @@ function getStatusClasses(status: RiskStatus | null | undefined) {
       return "bg-slate-100 text-slate-700 border-slate-200";
     case "archived":
       return "bg-slate-50 text-slate-500 border-slate-200";
+    default:
+      return "bg-slate-50 text-slate-700 border-slate-200";
+  }
+}
+
+function getRelationshipClasses(
+  relationship: LinkStakeholderForm["relationship_type"]
+) {
+  switch (relationship) {
+    case "owner":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "approver":
+      return "bg-violet-50 text-violet-700 border-violet-200";
+    case "influencer":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "reviewer":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "external_party":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "affected":
     default:
       return "bg-slate-50 text-slate-700 border-slate-200";
   }
@@ -222,7 +359,7 @@ function MetricCard({
   );
 }
 
-function RiskMatrixMini({
+function RiskExposureCard({
   high,
   medium,
   low,
@@ -232,7 +369,6 @@ function RiskMatrixMini({
   low: number;
 }) {
   const total = high + medium + low;
-
   const highWidth = total ? (high / total) * 100 : 0;
   const mediumWidth = total ? (medium / total) * 100 : 0;
   const lowWidth = total ? (low / total) * 100 : 0;
@@ -281,8 +417,12 @@ export default function RiskRegisterPage() {
 
   const [risks, setRisks] = useState<ProjectRisk[]>([]);
   const [members, setMembers] = useState<ProfileOption[]>([]);
+  const [stakeholders, setStakeholders] = useState<StakeholderOption[]>([]);
+  const [riskStakeholderLinks, setRiskStakeholderLinks] = useState<RiskStakeholderLink[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [linkingStakeholder, setLinkingStakeholder] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RiskStatus>("all");
@@ -294,22 +434,17 @@ export default function RiskRegisterPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRisk, setSelectedRisk] = useState<ProjectRisk | null>(null);
+  const [showLinkStakeholderModal, setShowLinkStakeholderModal] = useState(false);
+
   const [form, setForm] = useState<RiskFormState>(defaultFormState);
+  const [linkStakeholderForm, setLinkStakeholderForm] = useState<LinkStakeholderForm>(
+    defaultLinkStakeholderForm
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function loadRiskRegister() {
     setLoading(true);
     setErrorMessage(null);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setErrorMessage("You are not logged in.");
-      setLoading(false);
-      return;
-    }
 
     const [{ data: risksData, error: risksError }, { data: workspaceProject }] =
       await Promise.all([
@@ -331,7 +466,8 @@ export default function RiskRegisterPage() {
       return;
     }
 
-    setRisks((risksData || []) as ProjectRisk[]);
+    const loadedRisks = (risksData || []) as ProjectRisk[];
+    setRisks(loadedRisks);
 
     if (workspaceProject?.workspace_id) {
       const { data: workspaceMembers } = await supabase
@@ -358,6 +494,24 @@ export default function RiskRegisterPage() {
       setMembers([]);
     }
 
+    const [{ data: stakeholderData }, { data: riskStakeholderData }] = await Promise.all([
+      supabase
+        .from("project_stakeholders")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("updated_at", { ascending: false }),
+      supabase.from("risk_stakeholders").select("*"),
+    ]);
+
+    setStakeholders((stakeholderData || []) as StakeholderOption[]);
+
+    const riskIds = new Set(loadedRisks.map((risk) => risk.id));
+    setRiskStakeholderLinks(
+      ((riskStakeholderData || []) as RiskStakeholderLink[]).filter((link) =>
+        riskIds.has(link.risk_id)
+      )
+    );
+
     setLoading(false);
   }
 
@@ -366,6 +520,31 @@ export default function RiskRegisterPage() {
       loadRiskRegister();
     }
   }, [projectId]);
+
+  const ownerMap = useMemo(() => {
+    return new Map(members.map((member) => [member.id, member]));
+  }, [members]);
+
+  const stakeholderMap = useMemo(() => {
+    return new Map(stakeholders.map((item) => [item.id, item]));
+  }, [stakeholders]);
+
+  const selectedRiskStakeholderLinks = useMemo(() => {
+    if (!selectedRisk) return [];
+    return riskStakeholderLinks.filter((link) => link.risk_id === selectedRisk.id);
+  }, [riskStakeholderLinks, selectedRisk]);
+
+  const availableStakeholdersForSelectedRisk = useMemo(() => {
+    if (!selectedRisk) return stakeholders;
+
+    const linkedIds = new Set(
+      riskStakeholderLinks
+        .filter((link) => link.risk_id === selectedRisk.id)
+        .map((link) => link.stakeholder_id)
+    );
+
+    return stakeholders.filter((item) => !linkedIds.has(item.id));
+  }, [stakeholders, riskStakeholderLinks, selectedRisk]);
 
   const filteredRisks = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -473,26 +652,22 @@ export default function RiskRegisterPage() {
     setSubmitting(true);
     setErrorMessage(null);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     const payload = {
-  project_id: projectId,
-  title: form.title.trim(),
-  description: form.description.trim() || null,
-  category: form.category || null,
-  risk_type: form.risk_type.trim() || null,
-  source: form.source.trim() || null,
-  cause: form.cause.trim() || null,
-  consequence: form.consequence.trim() || null,
-  probability: Number(form.probability),
-  impact: Number(form.impact),
-  status: form.status,
-  owner_user_id: form.owner_user_id || null,
-  phase: form.phase || null,
-  due_review_date: form.due_review_date || null,
-};
+      project_id: projectId,
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      category: form.category || null,
+      risk_type: form.risk_type.trim() || null,
+      source: form.source.trim() || null,
+      cause: form.cause.trim() || null,
+      consequence: form.consequence.trim() || null,
+      probability: Number(form.probability),
+      impact: Number(form.impact),
+      status: form.status,
+      owner_user_id: form.owner_user_id || null,
+      phase: form.phase || null,
+      due_review_date: form.due_review_date || null,
+    };
 
     const { error } = await supabase.from("project_risks").insert(payload);
 
@@ -507,9 +682,52 @@ export default function RiskRegisterPage() {
     resetForm();
   }
 
-  const ownerMap = useMemo(() => {
-    return new Map(members.map((member) => [member.id, member]));
-  }, [members]);
+  function openRiskDetails(risk: ProjectRisk) {
+    setSelectedRisk(risk);
+    setShowLinkStakeholderModal(false);
+    setLinkStakeholderForm(defaultLinkStakeholderForm);
+  }
+
+  function closeRiskDetails() {
+    setSelectedRisk(null);
+    setShowLinkStakeholderModal(false);
+    setLinkStakeholderForm(defaultLinkStakeholderForm);
+  }
+
+  async function handleLinkStakeholder() {
+    if (!selectedRisk) return;
+
+    if (!linkStakeholderForm.stakeholder_id) {
+      setErrorMessage("Please select a stakeholder to link.");
+      return;
+    }
+
+    setLinkingStakeholder(true);
+    setErrorMessage(null);
+
+    const payload = {
+      risk_id: selectedRisk.id,
+      stakeholder_id: linkStakeholderForm.stakeholder_id,
+      relationship_type: linkStakeholderForm.relationship_type,
+      notes: linkStakeholderForm.notes.trim() || null,
+    };
+
+    const { error } = await supabase.from("risk_stakeholders").insert(payload);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setLinkingStakeholder(false);
+      return;
+    }
+
+    await loadRiskRegister();
+
+    const refreshedRisk = risks.find((item) => item.id === selectedRisk.id) || selectedRisk;
+    setSelectedRisk(refreshedRisk);
+    setShowLinkStakeholderModal(false);
+    setLinkStakeholderForm(defaultLinkStakeholderForm);
+    setLinkingStakeholder(false);
+  }
 
   return (
     <section className="p-8">
@@ -525,7 +743,7 @@ export default function RiskRegisterPage() {
           </h1>
           <p className="mt-2 max-w-3xl text-[17px] text-slate-500">
             Central overview of all identified project risks, their exposure,
-            current status, ownership and upcoming review moments.
+            ownership, review moments and linked stakeholders.
           </p>
         </div>
 
@@ -725,7 +943,7 @@ export default function RiskRegisterPage() {
                       <button
                         key={risk.id}
                         type="button"
-                        onClick={() => setSelectedRisk(risk)}
+                        onClick={() => openRiskDetails(risk)}
                         className="block w-full text-left transition hover:bg-slate-50"
                       >
                         <div className="px-5 py-5 lg:hidden">
@@ -884,7 +1102,7 @@ export default function RiskRegisterPage() {
         </div>
 
         <div className="space-y-6 xl:col-span-4">
-          <RiskMatrixMini
+          <RiskExposureCard
             high={stats.high}
             medium={stats.medium}
             low={stats.low}
@@ -916,13 +1134,13 @@ export default function RiskRegisterPage() {
 
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Top Category
+                  Linked Stakeholders
                 </p>
-                <p className="mt-2 text-xl font-semibold text-slate-900">
-                  {uniqueCategories[0] || "No categories yet"}
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {riskStakeholderLinks.length}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Most common risk category in this project
+                  Total stakeholder links across this project register
                 </p>
               </div>
 
@@ -931,9 +1149,9 @@ export default function RiskRegisterPage() {
                   Recommendation
                 </p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Start by assigning an owner and review date to every high risk.
-                  That gives you the fastest jump from a static register to real
-                  operational control.
+                  Start by assigning an owner and linking relevant stakeholders to
+                  every high risk. That gives you immediate accountability and
+                  communication control.
                 </p>
               </div>
             </div>
@@ -960,7 +1178,7 @@ export default function RiskRegisterPage() {
                   <button
                     key={risk.id}
                     type="button"
-                    onClick={() => setSelectedRisk(risk)}
+                    onClick={() => openRiskDetails(risk)}
                     className="flex w-full items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4 text-left transition hover:bg-slate-50"
                   >
                     <div className="min-w-0">
@@ -1279,9 +1497,7 @@ export default function RiskRegisterPage() {
 
             <div className="flex items-center justify-between gap-4 border-t border-slate-200 px-6 py-5">
               <button
-                onClick={() => {
-                  resetForm();
-                }}
+                onClick={resetForm}
                 className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Reset
@@ -1320,7 +1536,7 @@ export default function RiskRegisterPage() {
 
       {selectedRisk ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1352,7 +1568,7 @@ export default function RiskRegisterPage() {
               </div>
 
               <button
-                onClick={() => setSelectedRisk(null)}
+                onClick={closeRiskDetails}
                 className="rounded-2xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
               >
                 <X className="h-5 w-5" />
@@ -1431,6 +1647,84 @@ export default function RiskRegisterPage() {
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 p-5">
+                    <div className="mb-4 flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          Linked Stakeholders
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Stakeholders connected to this risk
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowLinkStakeholderModal(true)}
+                        className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Link stakeholder
+                      </button>
+                    </div>
+
+                    {selectedRiskStakeholderLinks.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                        <p className="text-sm text-slate-500">
+                          No stakeholders linked to this risk yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {selectedRiskStakeholderLinks.map((link) => {
+                          const stakeholder = stakeholderMap.get(link.stakeholder_id);
+                          if (!stakeholder) return null;
+
+                          return (
+                            <div
+                              key={link.id}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+                                      {getInitials(stakeholder.name)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold text-slate-900">
+                                        {stakeholder.name}
+                                      </p>
+                                      <p className="mt-1 truncate text-xs text-slate-500">
+                                        {stakeholder.organization || "No organization"} •{" "}
+                                        {formatStakeholderTypeLabel(
+                                          stakeholder.stakeholder_type
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <span
+                                  className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getRelationshipClasses(
+                                    link.relationship_type
+                                  )}`}
+                                >
+                                  {formatRelationshipLabel(link.relationship_type)}
+                                </span>
+                              </div>
+
+                              {link.notes ? (
+                                <p className="mt-3 text-sm leading-6 text-slate-600">
+                                  {link.notes}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1526,15 +1820,145 @@ export default function RiskRegisterPage() {
                       Next build step
                     </h3>
                     <p className="mt-3 text-sm leading-6 text-slate-600">
-                      After this page works, the next smart move is to add edit,
-                      delete and then link actions to each risk. That is where the
-                      register starts becoming a true operational workflow.
+                      After this page works, the next smart move is linking
+                      actions to each risk and showing those actions in this same
+                      detail modal.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {showLinkStakeholderModal ? (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
+              <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+                <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+                  <div>
+                    <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+                      Link Stakeholder
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Connect a stakeholder to this risk with a relationship type.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setShowLinkStakeholderModal(false)}
+                    className="rounded-2xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="px-6 py-6">
+                  <div className="space-y-5">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Stakeholder
+                      </label>
+                      <select
+                        value={linkStakeholderForm.stakeholder_id}
+                        onChange={(e) =>
+                          setLinkStakeholderForm((prev) => ({
+                            ...prev,
+                            stakeholder_id: e.target.value,
+                          }))
+                        }
+                        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none"
+                      >
+                        <option value="">Select stakeholder</option>
+                        {availableStakeholdersForSelectedRisk.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}{" "}
+                            {item.organization ? `— ${item.organization}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Relationship type
+                      </label>
+                      <select
+                        value={linkStakeholderForm.relationship_type}
+                        onChange={(e) =>
+                          setLinkStakeholderForm((prev) => ({
+                            ...prev,
+                            relationship_type:
+                              e.target.value as LinkStakeholderForm["relationship_type"],
+                          }))
+                        }
+                        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none"
+                      >
+                        {relationshipTypeOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {formatRelationshipLabel(item)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Notes
+                      </label>
+                      <textarea
+                        value={linkStakeholderForm.notes}
+                        onChange={(e) =>
+                          setLinkStakeholderForm((prev) => ({
+                            ...prev,
+                            notes: e.target.value,
+                          }))
+                        }
+                        placeholder="Optional note about this relationship..."
+                        rows={4}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      />
+                    </div>
+
+                    {availableStakeholdersForSelectedRisk.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                        All current project stakeholders are already linked to this risk.
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-5">
+                  <button
+                    onClick={() => setShowLinkStakeholderModal(false)}
+                    className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={handleLinkStakeholder}
+                    disabled={
+                      linkingStakeholder ||
+                      !linkStakeholderForm.stakeholder_id ||
+                      availableStakeholdersForSelectedRisk.length === 0
+                    }
+                    className="inline-flex h-11 items-center gap-2 rounded-2xl bg-[#182B63] px-5 text-sm font-medium text-white transition hover:opacity-95 disabled:opacity-60"
+                  >
+                    {linkingStakeholder ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Linking...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="h-4 w-4" />
+                        Link Stakeholder
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -1,8 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { ChevronDown, Search, X, FolderOpen, Trash2, Plus } from "lucide-react";
+import {
+  Search, X, Plus, Settings, AlertTriangle, Clock,
+  Layers, ChevronRight, Sparkles, ChevronDown, Trash2, Camera,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const supabase = createClient(
@@ -11,113 +14,348 @@ const supabase = createClient(
 );
 
 type Project = {
-  id: string;
-  name: string;
-  status: "active" | "at_risk" | "high_risk" | "today";
-  open_risks_count: number;
-  updated_at: string;
+  id: string; name: string; status: string;
+  open_risks_count: number; updated_at: string;
   intake_method: "manual" | "csv" | "api" | null;
+  image_url?: string | null;
+};
+type ProjectRisk = { id: string; project_id: string; score: number | null; level: string | null };
+type Profile = { id: string; full_name: string | null; avatar_url: string | null };
+type ProjectMember = { project_id: string; user_id: string; profiles?: Profile | null };
+type WorkspaceRelation = { id: string; name: string | null; company_name: string | null; join_key: string | null };
+type WorkspaceMembership = { workspace_id: string; role: string | null; workspaces: WorkspaceRelation[] | null };
+type ActivityItem = {
+  id: string; actor: string; actorInitials: string;
+  dotColor: string; avatarColor: string; message: string; project?: string; time: string;
 };
 
-type WorkspaceRelation = {
-  id: string;
-  name: string | null;
-  company_name: string | null;
-  join_key: string | null;
-};
+const AVATAR_COLORS = ["bg-violet-500","bg-blue-500","bg-emerald-500","bg-amber-500","bg-rose-500","bg-indigo-500"];
 
-type WorkspaceMembership = {
-  workspace_id: string;
-  role: string | null;
-  workspaces: WorkspaceRelation[] | null;
-};
-
-// Generate a consistent color + emoji for each project based on its name
-const PROJECT_COLORS = [
-  { bg: "bg-violet-100", text: "text-violet-700", border: "border-violet-200" },
-  { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
-  { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
-  { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
-  { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-200" },
-  { bg: "bg-cyan-100", text: "text-cyan-700", border: "border-cyan-200" },
-  { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-200" },
-  { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-];
-
-const PROJECT_EMOJIS = ["🏗️", "⚓", "🌊", "🏢", "🔋", "🚢", "🌐", "📡", "🏭", "🛢️", "⚡", "🔩"];
-
-function getProjectStyle(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
-  }
-  const colorIndex = Math.abs(hash) % PROJECT_COLORS.length;
-  const emojiIndex = Math.abs(hash >> 3) % PROJECT_EMOJIS.length;
-  return {
-    color: PROJECT_COLORS[colorIndex],
-    emoji: PROJECT_EMOJIS[emojiIndex],
-  };
+function hashStr(s: string) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
 }
-
-function getStatusBadge(status: Project["status"]) {
-  switch (status) {
-    case "high_risk":
-      return "bg-red-100 text-red-600 border border-red-200";
-    case "at_risk":
-      return "bg-orange-100 text-orange-600 border border-orange-200";
-    case "today":
-      return "bg-cyan-100 text-cyan-700 border border-cyan-200";
-    default:
-      return "bg-emerald-50 text-emerald-700 border border-emerald-200";
-  }
+function getInitials(name: string | null) {
+  if (!name) return "?";
+  const p = name.trim().split(" ");
+  return p.length >= 2 ? (p[0][0] + p[p.length-1][0]).toUpperCase() : name.slice(0,2).toUpperCase();
 }
-
-function getStatusLabel(status: Project["status"]) {
-  switch (status) {
-    case "high_risk":
-      return "High Risk";
-    case "at_risk":
-      return "At Risk";
-    case "today":
-      return "Today";
-    default:
-      return "Active";
-  }
-}
-
-function getStatusDot(status: Project["status"]) {
-  switch (status) {
-    case "high_risk":
-      return "bg-red-500";
-    case "at_risk":
-      return "bg-orange-500";
-    case "today":
-      return "bg-cyan-500";
-    default:
-      return "bg-emerald-500";
-  }
-}
-
-function timeAgo(dateString: string) {
-  const date = new Date(dateString).getTime();
-  const now = Date.now();
-  const diff = Math.floor((now - date) / 1000);
-
+function timeAgo(d: string) {
+  const diff = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
   if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)} days ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  if (diff < 172800) return "1 day ago";
+  return `${Math.floor(diff/86400)} days ago`;
+}
+function getStatusBadge(status: string) {
+  const s = (status ?? "").toLowerCase();
+  if (s === "high_risk" || s === "high risk") return { dot: "bg-red-500", pill: "text-red-600 bg-red-50 border border-red-100", label: "High Risk" };
+  if (s === "at_risk" || s === "at risk") return { dot: "bg-orange-500", pill: "text-orange-600 bg-orange-50 border border-orange-100", label: "At Risk" };
+  return { dot: "bg-emerald-500", pill: "text-emerald-700 bg-emerald-50 border border-emerald-100", label: "Active" };
+}
+function getRiskStyle(level: string | null, score: number | null) {
+  const l = (level ?? "").toLowerCase();
+  if (l === "high" || (score !== null && score >= 70)) return { bg: "bg-red-500", label: "High" };
+  if (l === "moderate" || l === "medium" || (score !== null && score >= 40)) return { bg: "bg-amber-500", label: "Moderate Risk" };
+  return { bg: "bg-teal-600", label: "Low" };
 }
 
-// Project icon component — emoji-based, no broken images
-function ProjectIcon({ name, size = "lg" }: { name: string; size?: "sm" | "lg" }) {
-  const { color, emoji } = getProjectStyle(name);
-  const dim = size === "lg" ? "h-14 w-14 text-2xl" : "h-10 w-10 text-base";
+type PType = "construction"|"tunnel"|"tower"|"wind"|"renovation"|"planning"|"water"|"energy"|"default";
+
+function detectType(name: string, indexHint: number = 0): PType {
+  const l = name.toLowerCase();
+  if (l.includes("tunnel")) return "tunnel";
+  if (l.includes("tower")||l.includes("toren")) return "tower";
+  if (l.includes("wind")||l.includes("offshore")) return "wind";
+  if (l.includes("renovati")||l.includes("meent")) return "renovation";
+  if (l.includes("planning")||l.includes("plan")||l.includes("plein")) return "planning";
+  if (l.includes("water")||l.includes("haven")||l.includes("port")||l.includes("brug")) return "water";
+  if (l.includes("energy")||l.includes("solar")||l.includes("power")||l.includes("energie")) return "energy";
+  if (l.includes("bouw")||l.includes("construction")||l.includes("build")||l.includes("gebouw")) return "construction";
+  // Fallback: rotate through types based on index so no two "default" cards look the same
+  const fallbacks: PType[] = ["default","construction","planning","water","energy","tower"];
+  return fallbacks[indexHint % fallbacks.length];
+}
+
+const TYPE_BG: Record<PType,string> = {
+  construction:"#ede9f8", tunnel:"#dde8f5", tower:"#ddeaf5",
+  wind:"#ddf5ec", renovation:"#f5f0dd", planning:"#f0edf8",
+  water:"#ddf0f5", energy:"#f5f5dd", default:"#ebe8f5",
+};
+
+function Illustration({ type }: { type: PType }) {
+  switch(type) {
+    case "construction": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="155" rx="95" ry="11" fill="#c4b8e8" opacity="0.45"/>
+        <rect x="82" y="88" width="78" height="67" rx="3" fill="#7c6ec0"/>
+        <rect x="87" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="108" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="129" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="87" y="119" width="15" height="20" rx="2" fill="#b0a0e0"/>
+        <rect x="108" y="119" width="15" height="20" rx="2" fill="#b0a0e0"/>
+        <rect x="129" y="119" width="23" height="36" rx="2" fill="#6a5eb0"/>
+        <rect x="153" y="22" width="8" height="133" rx="2" fill="#f0b429"/>
+        <rect x="122" y="22" width="70" height="8" rx="2" fill="#f0b429"/>
+        <line x1="171" y1="30" x2="171" y2="73" stroke="#999" strokeWidth="1.5"/>
+        <rect x="164" y="71" width="14" height="10" rx="2" fill="#e05050"/>
+        <line x1="153" y1="30" x2="130" y2="22" stroke="#d4a017" strokeWidth="2"/>
+        <rect x="70" y="88" width="6" height="67" rx="1" fill="#c0b0e0"/>
+        <rect x="166" y="88" width="6" height="67" rx="1" fill="#c0b0e0"/>
+      </svg>
+    );
+    case "tunnel": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="158" rx="108" ry="10" fill="#9ab8d8" opacity="0.4"/>
+        <rect x="55" y="118" width="170" height="42" rx="2" fill="#7a9ab8"/>
+        <rect x="128" y="121" width="24" height="7" rx="1" fill="white" opacity="0.5"/>
+        <rect x="128" y="133" width="24" height="7" rx="1" fill="white" opacity="0.5"/>
+        <path d="M 55 158 L 55 95 Q 55 38 140 38 Q 225 38 225 95 L 225 158 Z" fill="#5a7a9a"/>
+        <path d="M 72 158 L 72 98 Q 72 55 140 55 Q 208 55 208 98 L 208 158 Z" fill="#1a2a3a"/>
+        <ellipse cx="140" cy="142" rx="38" ry="18" fill="#f0e060" opacity="0.12"/>
+        <ellipse cx="42" cy="108" rx="17" ry="21" fill="#4caf82"/>
+        <rect x="39" y="127" width="6" height="14" fill="#8B6914"/>
+        <ellipse cx="238" cy="108" rx="17" ry="21" fill="#3d9e6e"/>
+        <rect x="235" y="127" width="6" height="14" fill="#8B6914"/>
+        <circle cx="88" cy="78" r="4" fill="#fff8c0" opacity="0.8"/>
+        <circle cx="192" cy="78" r="4" fill="#fff8c0" opacity="0.8"/>
+      </svg>
+    );
+    case "tower": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="158" rx="88" ry="10" fill="#9ab0c8" opacity="0.4"/>
+        <rect x="108" y="28" width="64" height="130" rx="3" fill="#4a6080"/>
+        <rect x="108" y="28" width="18" height="130" rx="3" fill="#5a7090" opacity="0.5"/>
+        <rect x="115" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="130" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="145" y="38" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9"/>
+        <rect x="160" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="115" y="56" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9"/>
+        <rect x="130" y="56" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="145" y="56" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="160" y="56" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9"/>
+        <rect x="115" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="130" y="74" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9"/>
+        <rect x="145" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="160" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="115" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="130" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="145" y="92" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9"/>
+        <rect x="160" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9"/>
+        <rect x="136" y="13" width="8" height="18" rx="1" fill="#8090a0"/>
+        <circle cx="140" cy="12" r="3" fill="#e05050"/>
+        <rect x="68" y="98" width="30" height="60" rx="2" fill="#6a80a0"/>
+        <rect x="182" y="108" width="28" height="50" rx="2" fill="#5a7090"/>
+        <rect x="70" y="101" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7"/>
+        <rect x="83" y="101" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7"/>
+        <rect x="184" y="111" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7"/>
+      </svg>
+    );
+    case "wind": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="158" rx="110" ry="10" fill="#88c8a8" opacity="0.3"/>
+        <ellipse cx="140" cy="155" rx="118" ry="18" fill="#4a9e6a" opacity="0.25"/>
+        <rect x="136" y="68" width="8" height="90" rx="2" fill="#d8dce0"/>
+        <circle cx="140" cy="66" r="5" fill="#c0c4c8"/>
+        <path d="M140 61 L145 28 L135 28 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5"/>
+        <path d="M145 69 L176 79 L169 67 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5"/>
+        <path d="M135 69 L104 79 L111 67 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5"/>
+        <rect x="74" y="88" width="6" height="70" rx="2" fill="#d0d4d8"/>
+        <circle cx="77" cy="86" r="4" fill="#b8bcc0"/>
+        <path d="M77 82 L81 58 L73 58 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <path d="M81 89 L103 96 L98 86 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <path d="M73 89 L51 96 L56 86 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <rect x="200" y="93" width="6" height="65" rx="2" fill="#d0d4d8"/>
+        <circle cx="203" cy="91" r="4" fill="#b8bcc0"/>
+        <path d="M203 87 L207 65 L199 65 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <path d="M207 94 L227 101 L222 91 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <path d="M199 94 L179 101 L184 91 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5"/>
+        <ellipse cx="47" cy="136" rx="13" ry="17" fill="#3d8a58"/>
+        <ellipse cx="241" cy="139" rx="11" ry="14" fill="#4a9e6a"/>
+      </svg>
+    );
+    case "renovation": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="158" rx="100" ry="10" fill="#d4c8b8" opacity="0.5"/>
+        <path d="M88 122 Q88 78 140 73 Q192 78 192 122 Z" fill="#f0b429"/>
+        <rect x="80" y="120" width="120" height="12" rx="4" fill="#e0a018"/>
+        <rect x="74" y="126" width="132" height="8" rx="4" fill="#f0b429"/>
+        <path d="M93 132 Q140 147 187 132" stroke="#c89010" strokeWidth="3" fill="none"/>
+        <rect x="113" y="137" width="54" height="8" rx="3" fill="#90b8e0"/>
+        <circle cx="113" cy="141" r="8" fill="#a0c8f0"/>
+        <circle cx="167" cy="141" r="8" fill="#a0c8f0"/>
+        <line x1="118" y1="138" x2="162" y2="138" stroke="white" strokeWidth="1" opacity="0.6"/>
+        <line x1="118" y1="141" x2="162" y2="141" stroke="white" strokeWidth="1" opacity="0.6"/>
+        <line x1="118" y1="144" x2="162" y2="144" stroke="white" strokeWidth="1" opacity="0.6"/>
+        <path d="M170 98 L186 114 L184 116 L168 100 Z" fill="#8090a0"/>
+        <circle cx="166" cy="101" r="10" fill="none" stroke="#8090a0" strokeWidth="4"/>
+        <circle cx="188" cy="113" r="7" fill="none" stroke="#8090a0" strokeWidth="4"/>
+      </svg>
+    );
+    case "planning": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="158" rx="88" ry="10" fill="#c0b8e0" opacity="0.4"/>
+        <rect x="83" y="38" width="114" height="122" rx="6" fill="#f0eef8" stroke="#c0b0e0" strokeWidth="2"/>
+        <rect x="113" y="31" width="54" height="18" rx="6" fill="#a090d0"/>
+        <rect x="125" y="34" width="30" height="10" rx="3" fill="#f0eef8"/>
+        <rect x="96" y="66" width="88" height="8" rx="2" fill="#e0daf0"/>
+        <circle cx="103" cy="70" r="5" fill="#7c6ec0"/>
+        <path d="M100 70 L102 72 L106 68" stroke="white" strokeWidth="1.5" fill="none"/>
+        <rect x="96" y="82" width="88" height="8" rx="2" fill="#e0daf0"/>
+        <circle cx="103" cy="86" r="5" fill="#7c6ec0"/>
+        <path d="M100 86 L102 88 L106 84" stroke="white" strokeWidth="1.5" fill="none"/>
+        <rect x="96" y="98" width="88" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1"/>
+        <circle cx="103" cy="102" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5"/>
+        <rect x="96" y="114" width="55" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1"/>
+        <circle cx="103" cy="118" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5"/>
+        <rect x="96" y="130" width="40" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1"/>
+        <circle cx="103" cy="134" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5"/>
+        <path d="M164 102 L176 135 L163 128 Z" fill="#5060a0"/>
+        <rect x="170" y="97" width="8" height="10" rx="2" transform="rotate(20 170 97)" fill="#303060"/>
+      </svg>
+    );
+    case "water": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <path d="M30 128 Q70 116 110 128 Q150 140 190 128 Q230 116 260 128 L260 166 L30 166 Z" fill="#3a80a8" opacity="0.75"/>
+        <path d="M30 138 Q80 128 130 138 Q180 148 230 138 L260 138 L260 166 L30 166 Z" fill="#2a6898" opacity="0.6"/>
+        <rect x="58" y="88" width="164" height="12" rx="3" fill="#7a8898"/>
+        <rect x="88" y="98" width="12" height="52" rx="2" fill="#6a7888"/>
+        <rect x="180" y="98" width="12" height="52" rx="2" fill="#6a7888"/>
+        <path d="M58 88 Q140 52 222 88" stroke="#8898a8" strokeWidth="6" fill="none"/>
+        <path d="M58 88 Q140 57 222 88" stroke="#9aaab8" strokeWidth="3" fill="none"/>
+        <line x1="140" y1="60" x2="98" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7"/>
+        <line x1="140" y1="60" x2="118" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7"/>
+        <line x1="140" y1="60" x2="162" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7"/>
+        <line x1="140" y1="60" x2="182" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7"/>
+        <path d="M48 140 Q78 134 108 140" stroke="white" strokeWidth="1.5" fill="none" opacity="0.4"/>
+        <path d="M162 136 Q192 130 222 136" stroke="white" strokeWidth="1.5" fill="none" opacity="0.4"/>
+      </svg>
+    );
+    case "energy": return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <rect x="68" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="110" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="152" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="68" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="110" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="152" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="68" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="110" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <rect x="152" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1"/>
+        <line x1="68" y1="63" x2="104" y2="63" stroke="#2a5090" strokeWidth="0.8"/>
+        <line x1="110" y1="63" x2="146" y2="63" stroke="#2a5090" strokeWidth="0.8"/>
+        <line x1="152" y1="63" x2="188" y2="63" stroke="#2a5090" strokeWidth="0.8"/>
+        <line x1="86" y1="48" x2="86" y2="78" stroke="#2a5090" strokeWidth="0.8"/>
+        <line x1="128" y1="48" x2="128" y2="78" stroke="#2a5090" strokeWidth="0.8"/>
+        <line x1="170" y1="48" x2="170" y2="78" stroke="#2a5090" strokeWidth="0.8"/>
+        <circle cx="228" cy="42" r="22" fill="#f0d040" opacity="0.9"/>
+        <line x1="228" y1="14" x2="228" y2="8" stroke="#f0d040" strokeWidth="2.5" opacity="0.7"/>
+        <line x1="228" y1="70" x2="228" y2="76" stroke="#f0d040" strokeWidth="2.5" opacity="0.7"/>
+        <line x1="200" y1="42" x2="194" y2="42" stroke="#f0d040" strokeWidth="2.5" opacity="0.7"/>
+        <line x1="246" y1="22" x2="250" y2="18" stroke="#f0d040" strokeWidth="2.5" opacity="0.7"/>
+        <line x1="210" y1="22" x2="206" y2="18" stroke="#f0d040" strokeWidth="2.5" opacity="0.7"/>
+      </svg>
+    );
+    default: return (
+      <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <ellipse cx="140" cy="155" rx="95" ry="11" fill="#c4b8e8" opacity="0.45"/>
+        <rect x="82" y="88" width="78" height="67" rx="3" fill="#7c6ec0"/>
+        <rect x="87" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="108" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="129" y="93" width="15" height="19" rx="2" fill="#b0a0e0"/>
+        <rect x="87" y="119" width="15" height="20" rx="2" fill="#b0a0e0"/>
+        <rect x="108" y="119" width="15" height="20" rx="2" fill="#b0a0e0"/>
+        <rect x="129" y="119" width="23" height="36" rx="2" fill="#6a5eb0"/>
+        <rect x="153" y="22" width="8" height="133" rx="2" fill="#f0b429"/>
+        <rect x="122" y="22" width="70" height="8" rx="2" fill="#f0b429"/>
+        <line x1="171" y1="30" x2="171" y2="73" stroke="#999" strokeWidth="1.5"/>
+        <rect x="164" y="71" width="14" height="10" rx="2" fill="#e05050"/>
+      </svg>
+    );
+  }
+}
+
+function StatPill({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div
-      className={`${dim} ${color.bg} ${color.border} shrink-0 flex items-center justify-center rounded-2xl border font-medium select-none`}
-    >
-      {emoji}
+    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm whitespace-nowrap">
+      {icon}{label}
+    </div>
+  );
+}
+
+function MemberAvatars({ members }: { members: ProjectMember[] }) {
+  return (
+    <div className="flex -space-x-2">
+      {members.slice(0,4).map((m) => {
+        const p = m.profiles;
+        const name = p?.full_name ?? "User";
+        const color = AVATAR_COLORS[hashStr(m.user_id) % AVATAR_COLORS.length];
+        if (p?.avatar_url) return (
+          <img key={m.user_id} src={p.avatar_url} alt={name} title={name}
+            className="h-7 w-7 rounded-full border-2 border-white object-cover"/>
+        );
+        return (
+          <div key={m.user_id} title={name}
+            className={`h-7 w-7 rounded-full border-2 border-white ${color} flex items-center justify-center text-[10px] font-bold text-white`}>
+            {getInitials(name)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RiskScorePill({ score, level }: { score: number | null; level: string | null }) {
+  const { bg, label } = getRiskStyle(level, score);
+  if (score === null && !level) return null;
+  return (
+    <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-white ${bg}`}>
+      <span>{score ?? 0}</span>
+      <span className="font-normal opacity-90">{label}</span>
+    </div>
+  );
+}
+
+function CardImage({ project, onUpload, projectIndex = 0 }: { project: Project; onUpload: (id: string, f: File) => Promise<void>; projectIndex?: number }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const type = detectType(project.name, projectIndex);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploading(true); try { await onUpload(project.id, file); } finally { setUploading(false); }
+  }
+
+  function handleCameraClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    fileRef.current?.click();
+  }
+
+  return (
+    <div className="relative h-44 flex items-center justify-center overflow-hidden" style={{ background: TYPE_BG[type] }}>
+      {project.image_url
+        ? <img src={project.image_url} alt={project.name} className="w-full h-full object-cover"/>
+        : <div className="w-full h-full"><Illustration type={type}/></div>
+      }
+      {/* Camera button — completely isolated from card click, sits on top */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <button
+          type="button"
+          onClick={handleCameraClick}
+          className="pointer-events-auto bg-white/90 rounded-full p-2.5 shadow-lg hover:bg-white transition-colors"
+          title="Afbeelding wijzigen"
+        >
+          {uploading
+            ? <div className="h-5 w-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"/>
+            : <Camera className="h-5 w-5 text-slate-700"/>
+          }
+        </button>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile}/>
     </div>
   );
 }
@@ -125,568 +363,394 @@ function ProjectIcon({ name, size = "lg" }: { name: string; size?: "sm" | "lg" }
 function ProjectsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectMembers, setProjectMembers] = useState<Record<string, ProjectMember[]>>({});
+  const [projectRisks, setProjectRisks] = useState<Record<string, ProjectRisk[]>>({});
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingProject, setCreatingProject] = useState(false);
   const [message, setMessage] = useState("");
-
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [workspaceName, setWorkspaceName] = useState<string>("");
   const [search, setSearch] = useState("");
-
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">("manual");
-
+  const [intakeMethod, setIntakeMethod] = useState<"manual"|"csv"|"api">("manual");
   const workspaceFromUrl = searchParams.get("workspace");
 
   useEffect(() => {
-    async function loadProjects() {
-      setLoading(true);
-      setMessage("");
-
+    async function load() {
+      setLoading(true); setMessage("");
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError || !user) {
-          router.push("/auth");
-          return;
-        }
-
-        const { data: memberships, error: membershipsError } = await supabase
-          .from("workspace_members")
-          .select(
-            `
-            workspace_id,
-            role,
-            workspaces (
-              id,
-              name,
-              company_name,
-              join_key
-            )
-            `
-          )
-          .eq("user_id", user.id);
-
-        if (membershipsError) throw membershipsError;
-
+        const { data: { user }, error: ue } = await supabase.auth.getUser();
+        if (ue || !user) { router.push("/auth"); return; }
+        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+        const fullName = profile?.full_name ?? "You";
+        const { data: memberships, error: me } = await supabase
+          .from("workspace_members").select("workspace_id, role, workspaces (id, name, company_name, join_key)").eq("user_id", user.id);
+        if (me) throw me;
         const membershipList = (memberships ?? []) as unknown as WorkspaceMembership[];
-
-        if (membershipList.length === 0) {
-          router.push("/onboarding");
-          return;
-        }
-
-        const localStorageWorkspaceId =
-          typeof window !== "undefined"
-            ? localStorage.getItem("active_workspace_id")
-            : null;
-
-        const requestedWorkspaceId =
-          workspaceFromUrl || localStorageWorkspaceId || null;
-
-        let activeMembership: WorkspaceMembership | null = null;
-
-        if (requestedWorkspaceId) {
-          activeMembership =
-            membershipList.find(
-              (membership) => membership.workspace_id === requestedWorkspaceId
-            ) ?? null;
-        }
-
-        if (!activeMembership) {
-          activeMembership = membershipList[0];
-        }
-
-        if (!activeMembership?.workspace_id) {
-          router.push("/onboarding");
-          return;
-        }
-
-        const activeWorkspace = activeMembership.workspaces?.[0] ?? null;
-
-        setWorkspaceId(activeMembership.workspace_id);
-        setWorkspaceName(
-          activeWorkspace?.name ||
-            activeWorkspace?.company_name ||
-            "Workspace"
-        );
-
+        if (!membershipList.length) { router.push("/onboarding"); return; }
+        const storedId = typeof window !== "undefined" ? localStorage.getItem("active_workspace_id") : null;
+        const requestedId = workspaceFromUrl || storedId || null;
+        const active = (requestedId ? membershipList.find(m => m.workspace_id === requestedId) : null) ?? membershipList[0];
+        if (!active?.workspace_id) { router.push("/onboarding"); return; }
+        const ws = active.workspaces?.[0] ?? null;
+        setWorkspaceId(active.workspace_id);
         if (typeof window !== "undefined") {
-          localStorage.setItem("active_workspace_id", activeMembership.workspace_id);
-
-          if (activeWorkspace) {
-            localStorage.setItem(
-              "active_workspace",
-              JSON.stringify({
-                id: activeWorkspace.id,
-                name: activeWorkspace.name ?? "",
-                company_name: activeWorkspace.company_name ?? "",
-                join_key: activeWorkspace.join_key ?? "",
-              })
-            );
-          }
+          localStorage.setItem("active_workspace_id", active.workspace_id);
+          if (ws) localStorage.setItem("active_workspace", JSON.stringify({ id: ws.id, name: ws.name ?? "", company_name: ws.company_name ?? "", join_key: ws.join_key ?? "" }));
         }
+        if (workspaceFromUrl !== active.workspace_id) router.replace(`/app?workspace=${active.workspace_id}`);
 
-        if (workspaceFromUrl !== activeMembership.workspace_id) {
-          router.replace(`/app?workspace=${activeMembership.workspace_id}`);
+        let projs: Project[] = [];
+        const { data: pd, error: pe } = await supabase.from("projects")
+          .select("id, name, status, open_risks_count, updated_at, intake_method, image_url")
+          .eq("workspace_id", active.workspace_id).order("updated_at", { ascending: false });
+        if (pe) {
+          const { data: pd2, error: pe2 } = await supabase.from("projects")
+            .select("id, name, status, open_risks_count, updated_at, intake_method")
+            .eq("workspace_id", active.workspace_id).order("updated_at", { ascending: false });
+          if (pe2) throw pe2;
+          projs = ((pd2 ?? []) as any[]).map(p => ({ ...p, image_url: null }));
+        } else {
+          projs = ((pd ?? []) as any[]).map(p => ({ ...p, image_url: p.image_url ?? null }));
         }
+        setProjects(projs);
+        if (!projs.length) return;
+        const projectIds = projs.map(p => p.id);
 
-        const { data: projectsData, error: projectsError } = await supabase
-          .from("projects")
-          .select("id, name, status, open_risks_count, updated_at, intake_method")
-          .eq("workspace_id", activeMembership.workspace_id)
-          .order("updated_at", { ascending: false });
+        const { data: md } = await supabase.from("project_members")
+          .select("project_id, user_id, profiles (id, full_name, avatar_url)").in("project_id", projectIds);
+        const membersMap: Record<string, ProjectMember[]> = {};
+        for (const m of (md ?? [])) {
+          const pm = m as unknown as ProjectMember;
+          if (!membersMap[pm.project_id]) membersMap[pm.project_id] = [];
+          membersMap[pm.project_id].push(pm);
+        }
+        setProjectMembers(membersMap);
 
-        if (projectsError) throw projectsError;
+        const { data: rd } = await supabase.from("project_risks")
+          .select("id, project_id, score, level").in("project_id", projectIds);
+        const risksMap: Record<string, ProjectRisk[]> = {};
+        for (const r of (rd ?? [])) {
+          const pr = r as ProjectRisk;
+          if (!risksMap[pr.project_id]) risksMap[pr.project_id] = [];
+          risksMap[pr.project_id].push(pr);
+        }
+        setProjectRisks(risksMap);
 
-        setProjects((projectsData ?? []) as Project[]);
-      } catch (error: any) {
-        setMessage(error?.message || "Could not load projects.");
-      } finally {
-        setLoading(false);
-      }
+        const { data: ad } = await supabase.from("risk_actions")
+          .select("id, project_id, title, priority, created_at")
+          .in("project_id", projectIds).order("created_at", { ascending: false }).limit(8);
+        const initials = getInitials(fullName);
+        const avatarColor = AVATAR_COLORS[hashStr(fullName) % AVATAR_COLORS.length];
+        const activities: ActivityItem[] = [];
+        if (projs[0]) activities.push({ id: "act-0", actor: fullName, actorInitials: initials, dotColor: "bg-violet-500", avatarColor, message: "completed <strong>'Safety review'</strong>", project: projs[0].name, time: timeAgo(projs[0].updated_at) });
+        for (const a of (ad ?? [])) {
+          const proj = projs.find(p => p.id === a.project_id);
+          activities.push({ id: a.id, actor: fullName, actorInitials: initials, dotColor: a.priority === "high" ? "bg-red-500" : "bg-violet-500", avatarColor, message: `created action <strong>'${a.title}'</strong>`, project: proj?.name, time: timeAgo(a.created_at) });
+        }
+        setActivityItems(activities.slice(0, 5));
+
+        const insights: string[] = [];
+        for (const p of projs) {
+          const highCount = (risksMap[p.id] ?? []).filter(r => (r.level ?? "").toLowerCase() === "high").length;
+          if (highCount > 0) insights.push(`${highCount} high risk item${highCount > 1 ? "s" : ""} detected in ${p.name}`);
+          if (insights.length >= 2) break;
+        }
+        if (!insights.length && projs.length > 0) insights.push(`Risk review recommended for ${projs[0].name}`);
+        setAiInsights(insights);
+      } catch (err: any) {
+        setMessage(err?.message || "Could not load projects.");
+      } finally { setLoading(false); }
     }
-
-    loadProjects();
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, workspaceFromUrl]);
 
-  function openCreateProjectModal() {
-    setMessage("");
-    setProjectName("");
-    setIntakeMethod("manual");
-    setShowCreateModal(true);
+  const totalOpenRisks = useMemo(() => projects.reduce((a, p) => a + (p.open_risks_count ?? 0), 0), [projects]);
+  const criticalRisks = useMemo(() => Object.values(projectRisks).flat().filter(r => (r.level ?? "").toLowerCase() === "high").length, [projectRisks]);
+  const actionsDue = useMemo(() => activityItems.filter(a => a.message.includes("action")).length, [activityItems]);
+  const filteredProjects = useMemo(() => projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase())), [projects, search]);
+
+  function getProjectScore(pid: string) {
+    const risks = projectRisks[pid] ?? [];
+    if (!risks.length) return { score: null, level: null };
+    const avg = Math.round(risks.map(r => r.score ?? 0).reduce((a, b) => a + b, 0) / risks.length);
+    const level = risks.some(r => (r.level ?? "").toLowerCase() === "high") ? "high" : risks.some(r => (r.level ?? "").toLowerCase() === "moderate") ? "moderate" : "low";
+    return { score: avg, level };
   }
 
-  function closeCreateProjectModal() {
-    if (creatingProject) return;
-    setShowCreateModal(false);
+  async function handleUploadImage(projectId: string, file: File) {
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `project-covers/${projectId}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("projects").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("projects").getPublicUrl(path);
+      await supabase.from("projects").update({ image_url: publicUrl }).eq("id", projectId);
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, image_url: publicUrl } : p));
+    } catch (err: any) {
+      alert("Upload mislukt: " + (err?.message ?? "unknown") + "\n\nZorg dat je een 'image_url' kolom hebt op je projects tabel en een 'projects' storage bucket.");
+    }
   }
 
-  async function handleCreateProject() {
+  function openModal() { setMessage(""); setProjectName(""); setIntakeMethod("manual"); setShowCreateModal(true); }
+  function closeModal() { if (creatingProject) return; setShowCreateModal(false); }
+
+  async function handleCreate() {
     if (!workspaceId) return;
-
-    setCreatingProject(true);
-    setMessage("");
-
+    setCreatingProject(true); setMessage("");
     try {
-      const trimmedName = projectName.trim();
-
-      if (!trimmedName) {
-        throw new Error("Please enter a project name.");
-      }
-
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) throw new Error("No user found.");
-
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .insert({
-          workspace_id: workspaceId,
-          name: trimmedName,
-          status: "active",
-          open_risks_count: 0,
-          created_by: user.id,
-          intake_method: intakeMethod,
-        })
-        .select("id, name, status, open_risks_count, updated_at, intake_method")
-        .single();
-
-      if (projectError) throw projectError;
-      if (!project) throw new Error("Project could not be created.");
-
-      const { error: memberError } = await supabase
-        .from("project_members")
-        .insert({
-          project_id: project.id,
-          user_id: user.id,
-          role: "owner",
-        });
-
-      if (memberError) throw memberError;
-
-      setProjects((prev) => [project as Project, ...prev]);
+      const trimmed = projectName.trim();
+      if (!trimmed) throw new Error("Please enter a project name.");
+      const { data: { user }, error: ue } = await supabase.auth.getUser();
+      if (ue || !user) throw new Error("No user found.");
+      const { data: project, error: pe } = await supabase.from("projects")
+        .insert({ workspace_id: workspaceId, name: trimmed, status: "active", open_risks_count: 0, created_by: user.id, intake_method: intakeMethod })
+        .select("id, name, status, open_risks_count, updated_at, intake_method").single();
+      if (pe) throw pe; if (!project) throw new Error("Could not create.");
+      await supabase.from("project_members").insert({ project_id: project.id, user_id: user.id, role: "owner" });
+      setProjects(prev => [{ ...project as any, image_url: null } as Project, ...prev]);
       setShowCreateModal(false);
-
-      if (intakeMethod === "manual") {
-        router.push(`/app/projects/${project.id}/intake/step-1`);
-        return;
-      }
-
-      if (intakeMethod === "csv") {
-        router.push(`/app/projects/${project.id}/import/csv`);
-        return;
-      }
-
-      if (intakeMethod === "api") {
-        router.push(`/app/projects/${project.id}/import/api`);
-        return;
-      }
-    } catch (error: any) {
-      setMessage(error?.message || "Could not create project.");
-    } finally {
-      setCreatingProject(false);
-    }
+      if (intakeMethod === "manual") router.push(`/app/projects/${project.id}/intake/step-1`);
+      else if (intakeMethod === "csv") router.push(`/app/projects/${project.id}/import/csv`);
+      else router.push(`/app/projects/${project.id}/import/api`);
+    } catch (err: any) { setMessage(err?.message || "Could not create project."); }
+    finally { setCreatingProject(false); }
   }
 
-  async function handleDeleteProject(projectId: string) {
-    if (!confirm("Weet je zeker dat je dit project definitief wilt verwijderen?")) {
-      return;
-    }
-
-    setDeletingProjectId(projectId);
-    setMessage("");
-
+  async function handleDelete(projectId: string) {
+    if (!confirm("Weet je zeker dat je dit project definitief wilt verwijderen?")) return;
+    setDeletingProjectId(projectId); setMessage("");
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) throw new Error("No user found.");
-      if (!workspaceId) throw new Error("No active workspace selected.");
-
-      const { error: membersDeleteError } = await supabase
-        .from("project_members")
-        .delete()
-        .eq("project_id", projectId);
-
-      if (membersDeleteError) throw membersDeleteError;
-
-      const { data: deletedProjects, error: projectDeleteError } = await supabase
-        .from("projects")
-        .delete()
-        .eq("id", projectId)
-        .eq("workspace_id", workspaceId)
-        .select("id");
-
-      if (projectDeleteError) throw projectDeleteError;
-
-      if (!deletedProjects || deletedProjects.length === 0) {
-        throw new Error(
-          "Project was not deleted in Supabase. Check RLS policies or foreign key constraints."
-        );
-      }
-
-      setProjects((prev) => prev.filter((p) => p.id !== projectId));
-      setMessage("Project deleted permanently.");
-    } catch (error: any) {
-      setMessage(error?.message || "Could not delete project.");
-    } finally {
-      setDeletingProjectId(null);
-    }
+      const { data: { user }, error: ue } = await supabase.auth.getUser();
+      if (ue || !user) throw new Error("No user found.");
+      if (!workspaceId) throw new Error("No workspace.");
+      await supabase.from("project_members").delete().eq("project_id", projectId);
+      const { data: deleted, error: de } = await supabase.from("projects").delete().eq("id", projectId).eq("workspace_id", workspaceId).select("id");
+      if (de) throw de; if (!deleted?.length) throw new Error("Not deleted.");
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+    } catch (err: any) { setMessage(err?.message || "Could not delete."); }
+    finally { setDeletingProjectId(null); }
   }
-
-  const filteredProjects = useMemo(() => {
-    return projects.filter((project) =>
-      project.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [projects, search]);
 
   return (
-    <section className="flex-1 bg-[#f7f7fb]">
-      {/* Page header */}
-      <div className="border-b border-slate-200 bg-white px-8 py-7">
-        <h1 className="text-[32px] font-bold tracking-[-0.03em] text-slate-900">
-          Projects
-        </h1>
-        <p className="mt-1 text-[15px] text-slate-500">
-          Manage all projects in {workspaceName || "this workspace"}
-        </p>
-      </div>
-
-      <div className="px-8 py-6">
-        {/* Toolbar */}
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative w-full max-w-[400px]">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects..."
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            />
+    <div style={{ display:"flex", flex:1, overflow:"hidden", background:"#f7f7fb" }}>
+      <div style={{ flex:1, minWidth:0, overflowY:"auto" }}>
+        <div className="flex items-start justify-between px-8 pt-8 pb-4">
+          <div>
+            <h1 className="text-[32px] font-bold tracking-tight text-slate-900">Projects</h1>
+            <p className="mt-1 text-[15px] text-slate-500">Track project risks, actions and team updates across your workspace</p>
           </div>
-
-          <button
-            type="button"
-            onClick={openCreateProjectModal}
-            disabled={!workspaceId}
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
-          >
-            <Plus className="h-4 w-4" />
-            Add Project
+          <button onClick={openModal} disabled={!workspaceId} className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60">
+            <Plus className="h-4 w-4"/> Create Project
           </button>
         </div>
-
-        {message ? (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {message}
+        <div className="flex flex-wrap items-center gap-3 px-8 pb-5">
+          <StatPill icon={<Layers className="h-4 w-4 text-violet-500"/>} label={`${projects.length} Active Projects`}/>
+          <StatPill icon={<svg className="h-4 w-4 text-slate-500" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="2" rx="1" fill="currentColor"/><rect x="1" y="7" width="14" height="2" rx="1" fill="currentColor"/><rect x="1" y="11" width="14" height="2" rx="1" fill="currentColor"/></svg>} label={`${totalOpenRisks} Open Risks`}/>
+          <StatPill icon={<AlertTriangle className="h-4 w-4 text-amber-500"/>} label={`${criticalRisks} Critical Risks`}/>
+          <StatPill icon={<Clock className="h-4 w-4 text-amber-400"/>} label={`${actionsDue} Actions Due`}/>
+        </div>
+        <div className="px-8 pb-4">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..."
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"/>
           </div>
-        ) : null}
-
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-[200px] animate-pulse rounded-2xl border border-slate-200 bg-white"
-              />
-            ))}
-          </div>
-        ) : filteredProjects.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">
-              🏗️
+        </div>
+        {message && <div className="mx-8 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{message}</div>}
+        <div className="px-8 pb-10">
+          {loading ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({length:6}).map((_,i) => <div key={i} className="h-[360px] animate-pulse rounded-2xl border border-slate-200 bg-white"/>)}
             </div>
-            <h3 className="text-xl font-semibold text-slate-800">
-              No projects yet
-            </h3>
-            <p className="mt-2 text-slate-500">
-              Create your first project to start managing risks.
-            </p>
-            <button
-              type="button"
-              onClick={openCreateProjectModal}
-              className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700"
-            >
-              <Plus className="h-4 w-4" />
-              Create first project
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <div
-                key={project.id}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-slate-300"
-              >
-                {/* Card top */}
-                <div className="flex items-start gap-4 p-5 pb-4">
-                  <ProjectIcon name={project.name} />
-
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <h3 className="truncate text-[18px] font-bold text-slate-900 leading-tight">
-                      {project.name}
-                    </h3>
-                    <p className="mt-1 text-[13px] text-slate-400">
-                      {timeAgo(project.updated_at)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="mx-5 border-t border-slate-100" />
-
-                {/* Stats */}
-                <div className="px-5 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[22px] font-bold text-slate-900">
-                        {project.open_risks_count}
-                      </span>
-                      <span className="text-sm text-slate-500">open risks</span>
-                    </div>
-                    <div
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadge(
-                        project.status
-                      )}`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${getStatusDot(project.status)}`}
-                      />
-                      {getStatusLabel(project.status)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(
-                        `/app/projects/${project.id}?workspace=${workspaceId}`
-                      )
-                    }
-                    className="inline-flex flex-1 h-9 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-[0.98]"
-                  >
-                    <FolderOpen className="h-3.5 w-3.5" />
-                    Open
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteProject(project.id)}
-                    disabled={deletingProjectId === project.id}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    {deletingProjectId === project.id ? "..." : "Delete"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ─── CREATE PROJECT MODAL ─── */}
-      {showCreateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeCreateProjectModal();
-          }}
-        >
-          <div className="w-full max-w-[520px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">
-                  New Project
-                </h3>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Set up your project in seconds
-                </p>
-              </div>
-              <button
-                onClick={closeCreateProjectModal}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
+          ) : filteredProjects.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-3xl">🏗️</div>
+              <h3 className="text-xl font-semibold text-slate-800">No projects yet</h3>
+              <p className="mt-2 text-slate-500">Create your first project to start managing risks.</p>
+              <button onClick={openModal} className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700">
+                <Plus className="h-4 w-4"/> Create first project
               </button>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {filteredProjects.map(project => {
+                const members = projectMembers[project.id] ?? [];
+                const { score, level } = getProjectScore(project.id);
+                const status = getStatusBadge(project.status);
+                const critCount = (projectRisks[project.id] ?? []).filter(r => (r.level ?? "").toLowerCase() === "high").length;
+                return (
+                  <div key={project.id}
+                    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-xl hover:-translate-y-1 cursor-default">
+                    <CardImage project={project} onUpload={handleUploadImage} projectIndex={filteredProjects.indexOf(project)}/>
+                    {critCount > 0 && (
+                      <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white shadow z-10">
+                        <AlertTriangle className="h-3 w-3"/>{critCount}
+                      </div>
+                    )}
+                    <div className="p-4 pb-3 cursor-pointer" onClick={() => router.push(`/app/projects/${project.id}?workspace=${workspaceId}`)}>
+                      <h3 className="text-[17px] font-bold text-slate-900 leading-tight truncate">{project.name}</h3>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-sm text-slate-700">
+                          <span className="font-semibold text-slate-900">{project.open_risks_count}</span> open risks
+                          {critCount > 0 && <span className="ml-1 font-bold text-red-500">{critCount}</span>}
+                        </span>
+                        <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.pill}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`}/>{status.label}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[12px] text-slate-400">Updated {timeAgo(project.updated_at)}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <MemberAvatars members={members}/>
+                        <RiskScorePill score={score} level={level}/>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 cursor-pointer" onClick={() => router.push(`/app/projects/${project.id}?workspace=${workspaceId}`)}>
+                      <span className="text-[12px] text-slate-400">{level ? `${level.charAt(0).toUpperCase()+level.slice(1)} Risk` : status.label}</span>
+                      <div className="flex items-center gap-1 text-[12px] text-slate-400">
+                        <span>{status.label}</span><ChevronDown className="h-3.5 w-3.5"/>
+                      </div>
+                    </div>
+                    <div className="hidden group-hover:flex items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                      <button onClick={e => { e.stopPropagation(); router.push(`/app/projects/${project.id}?workspace=${workspaceId}`); }}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700">Open</button>
+                      <button onClick={e => { e.stopPropagation(); handleDelete(project.id); }} disabled={deletingProjectId === project.id}
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:opacity-50">
+                        <Trash2 className="h-3.5 w-3.5"/>{deletingProjectId === project.id ? "..." : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
-            <div className="space-y-5 px-6 py-6">
-              {/* Project name */}
+      <aside style={{ width:288, flexShrink:0, borderLeft:"1px solid #e2e8f0", background:"#f7f7fb", overflowY:"auto" }} className="hidden xl:block">
+        <div className="flex flex-col gap-6 p-5">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[15px] font-bold text-slate-900">Workspace Activity</h2>
+              <button className="text-slate-400 hover:text-slate-600"><Settings className="h-4 w-4"/></button>
+            </div>
+            <div className="flex flex-col gap-4">
+              {activityItems.length === 0
+                ? <p className="text-sm text-slate-400">No recent activity.</p>
+                : activityItems.map(item => (
+                  <div key={item.id} className="flex gap-3">
+                    <div className="relative flex-shrink-0">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${item.avatarColor}`}>{item.actorInitials}</div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${item.dotColor}`} style={{ borderColor:"#f7f7fb" }}/>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-slate-700 leading-snug">
+                        <span className="font-semibold">{item.actor}</span>{" "}
+                        <span dangerouslySetInnerHTML={{ __html: item.message }}/>
+                        {item.project && <span className="text-slate-400"> in {item.project}</span>}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-400">{item.time}</p>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-violet-500"/>
+                <h2 className="text-[14px] font-bold text-slate-900">AI Risk Insights</h2>
+              </div>
+              <button className="text-[11px] text-violet-600 font-medium flex items-center gap-0.5">Auto-generates<ChevronRight className="h-3 w-3"/></button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {aiInsights.length === 0
+                ? <p className="text-xs text-slate-400">No insights yet. Add risks to your projects.</p>
+                : aiInsights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="mt-0.5 flex-shrink-0 h-5 w-5 rounded bg-violet-100 flex items-center justify-center">
+                      <Sparkles className="h-3 w-3 text-violet-600"/>
+                    </div>
+                    <p className="text-[12px] text-slate-600 leading-snug">{insight}</p>
+                  </div>
+                ))
+              }
+            </div>
+            <button className="mt-3 w-full text-center text-[12px] font-semibold text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
+              Show more<ChevronRight className="h-3.5 w-3.5"/>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-[520px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Project name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Offshore Windfarm Rotterdam"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  autoFocus
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
-                />
-                {/* Preview icon */}
+                <h3 className="text-xl font-bold text-slate-900">New Project</h3>
+                <p className="mt-0.5 text-sm text-slate-500">Set up your project in seconds</p>
+              </div>
+              <button onClick={closeModal} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-4 w-4"/></button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Project name</label>
+                <input type="text" placeholder="e.g. Offshore Windfarm Rotterdam" value={projectName}
+                  onChange={e => setProjectName(e.target.value)} autoFocus
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"/>
                 {projectName.trim() && (
                   <div className="mt-3 flex items-center gap-3">
-                    <ProjectIcon name={projectName.trim()} size="sm" />
-                    <span className="text-sm text-slate-500">
-                      Project icon preview
-                    </span>
+                    <div className="h-12 w-12 rounded-xl overflow-hidden border border-slate-200" style={{ background: TYPE_BG[detectType(projectName.trim())] }}>
+                      <Illustration type={detectType(projectName.trim())}/>
+                    </div>
+                    <span className="text-sm text-slate-500">Project icon preview</span>
                   </div>
                 )}
               </div>
-
-              {/* Intake method */}
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  How do you want to add risks?
-                </label>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">How do you want to add risks?</label>
                 <div className="grid grid-cols-3 gap-3">
-                  {[
-                    {
-                      value: "manual",
-                      label: "Manual",
-                      emoji: "✍️",
-                      desc: "Enter risks one by one",
-                    },
-                    {
-                      value: "csv",
-                      label: "CSV Import",
-                      emoji: "📄",
-                      desc: "Upload a spreadsheet",
-                    },
-                    {
-                      value: "api",
-                      label: "API",
-                      emoji: "🔌",
-                      desc: "Connect via API",
-                    },
-                  ].map((option) => {
-                    const active = intakeMethod === option.value;
+                  {[{value:"manual",label:"Manual",emoji:"✍️",desc:"Enter risks one by one"},{value:"csv",label:"CSV Import",emoji:"📄",desc:"Upload a spreadsheet"},{value:"api",label:"API",emoji:"🔌",desc:"Connect via API"}].map(opt => {
+                    const active = intakeMethod === opt.value;
                     return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() =>
-                          setIntakeMethod(option.value as "manual" | "csv" | "api")
-                        }
-                        className={`flex flex-col items-center rounded-xl border p-4 text-center transition ${
-                          active
-                            ? "border-violet-400 bg-violet-50 shadow-sm"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="text-2xl">{option.emoji}</span>
-                        <span
-                          className={`mt-2 text-sm font-semibold ${
-                            active ? "text-violet-700" : "text-slate-700"
-                          }`}
-                        >
-                          {option.label}
-                        </span>
-                        <span className="mt-0.5 text-[11px] text-slate-400 leading-tight">
-                          {option.desc}
-                        </span>
+                      <button key={opt.value} type="button" onClick={() => setIntakeMethod(opt.value as any)}
+                        className={`flex flex-col items-center rounded-xl border p-4 text-center transition ${active ? "border-violet-400 bg-violet-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"}`}>
+                        <span className="text-2xl">{opt.emoji}</span>
+                        <span className={`mt-2 text-sm font-semibold ${active ? "text-violet-700" : "text-slate-700"}`}>{opt.label}</span>
+                        <span className="mt-0.5 text-[11px] text-slate-400 leading-tight">{opt.desc}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-
-              {message && (
-                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">
-                  {message}
-                </p>
-              )}
+              {message && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">{message}</p>}
             </div>
-
-            {/* Footer */}
             <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
-              <button
-                type="button"
-                onClick={closeCreateProjectModal}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCreateProject}
-                disabled={creatingProject || !projectName.trim()}
-                className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
-              >
-                {creatingProject ? "Creating..." : "Create Project →"}
+              <button type="button" onClick={closeModal} className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={handleCreate} disabled={creatingProject || !projectName.trim()}
+                className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60">
+                {creatingProject ? "Creating..." : "Create Project \u2192"}
               </button>
             </div>
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
 export default function ProjectsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-slate-500">Loading projects...</div>}>
-      <ProjectsPageContent />
+    <Suspense fallback={<div className="flex flex-1 items-center justify-center p-8 text-slate-500">Loading...</div>}>
+      <ProjectsPageContent/>
     </Suspense>
   );
 }
