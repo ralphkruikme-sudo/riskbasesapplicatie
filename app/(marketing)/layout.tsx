@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import MarketingHeader from "./MarketingHeader";
+import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "RiskBases",
@@ -9,31 +10,42 @@ export const metadata: Metadata = {
     "RiskBases helps teams manage risks, actions, stakeholders and reporting in one powerful workspace.",
 };
 
-const productLinks = [
-  { label: "Product", href: "/" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Features", href: "/features" },
-  { label: "Resources", href: "/resources" },
-];
-
-const resourceLinks = [
-  { label: "Documentation", href: "/documentation" },
-  { label: "Guides", href: "/guides" },
-  { label: "Blog", href: "/blog" },
-  { label: "Case Studies", href: "/case-studies" },
-];
-
-const companyLinks = [
-  { label: "About", href: "/about" },
-  { label: "Contact", href: "/contact" },
-  { label: "Book a Demo", href: "/book-demo" },
-  { label: "Sign up", href: "/auth" },
-];
-
-const legalLinks = [
-  { label: "Privacy Policy", href: "/privacy" },
-  { label: "Terms of Service", href: "/terms" },
-  { label: "Cookie Policy", href: "/cookies" },
+const footerNav = [
+  {
+    title: "Product",
+    links: [
+      { label: "Product", href: "/" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Features", href: "/features" },
+      { label: "Resources", href: "/resources" },
+    ],
+  },
+  {
+    title: "Resources",
+    links: [
+      { label: "Documentation", href: "/documentation" },
+      { label: "Guides", href: "/guides" },
+      { label: "Blog", href: "/blog" },
+      { label: "Case Studies", href: "/case-studies" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Book a Demo", href: "/book-demo" },
+      { label: "Sign up", href: "/auth" },
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Cookie Policy", href: "/cookies" },
+    ],
+  },
 ];
 
 export default function MarketingLayout({
@@ -44,122 +56,104 @@ export default function MarketingLayout({
   return (
     <div className="min-h-screen bg-[#f7f8fc] text-slate-950">
       <MarketingHeader />
-
       {children}
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-[1480px] px-6 py-16 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr_0.8fr]">
-            <div className="max-w-[320px]">
+      <footer className="relative isolate overflow-hidden border-t border-slate-200 bg-white">
+        {/* Subtle gradient top */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/60 to-transparent" />
+
+        {/* Main footer content */}
+        <div className="mx-auto max-w-[1400px] px-6 pb-10 pt-16 lg:px-10">
+          <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
+            {/* Brand column */}
+            <div>
               <Link href="/" className="flex w-fit items-center gap-3">
                 <Image
                   src="/logo-icon.png"
                   alt="RiskBases logo"
-                  width={38}
-                  height={38}
-                  className="h-[38px] w-[38px] object-contain"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 object-contain"
                 />
-                <span className="text-[28px] font-bold tracking-[-0.05em] text-slate-950">
+                <span className="text-[22px] font-bold tracking-[-0.05em] text-slate-950">
                   RiskBases
                 </span>
               </Link>
 
-              <p className="mt-6 text-[18px] leading-8 text-slate-500">
+              <p className="mt-5 max-w-[260px] text-[15px] leading-7 text-slate-500">
                 AI-driven risk management for safer, smarter projects.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <span className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-[13px] font-semibold text-violet-700">
+              <div className="mt-6 flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700">
                   SOC 2 Ready
                 </span>
-                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[13px] font-semibold text-slate-600">
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-600">
                   GDPR Focused
                 </span>
               </div>
+
+              {/* Mini CTA */}
+              <Link
+                href="/book-demo"
+                className="mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_6px_20px_rgba(109,40,217,0.24)] transition hover:scale-[1.02]"
+              >
+                Book a demo
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
-            <FooterColumn title="Product" links={productLinks} />
-            <FooterColumn title="Resources" links={resourceLinks} />
-            <FooterColumn title="Company" links={companyLinks} />
-            <FooterColumn title="Legal" links={legalLinks} />
+            {/* Nav columns */}
+            {footerNav.map((col) => (
+              <div key={col.title}>
+                <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                  {col.title}
+                </h3>
+                <ul className="mt-5 flex flex-col gap-3.5">
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="text-[15px] text-slate-600 transition hover:text-violet-600"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
+        </div>
 
-          <div className="mt-14 border-t border-slate-200 pt-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-[760px]">
-                <p className="text-[15px] font-medium text-slate-900">
-                  © 2026 RiskBases. All rights reserved.
-                </p>
+        {/* Bottom bar */}
+        <div className="border-t border-slate-100">
+          <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-4 px-6 py-6 text-[13px] text-slate-400 lg:flex-row lg:items-center lg:px-10">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <span>© 2026 RiskBases. All rights reserved.</span>
+              <span className="hidden h-3.5 w-px bg-slate-200 lg:block" />
+              <Link href="/privacy" className="transition hover:text-violet-600">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="transition hover:text-violet-600">
+                Terms of Service
+              </Link>
+              <Link href="/cookies" className="transition hover:text-violet-600">
+                Cookie Policy
+              </Link>
+            </div>
 
-                <p className="mt-3 text-[15px] leading-7 text-slate-500">
-                  We use cookies to improve your experience and analyze site
-                  traffic. Read our{" "}
-                  <Link
-                    href="/cookies"
-                    className="font-medium text-violet-600 transition hover:text-violet-700"
-                  >
-                    Cookie Policy
-                  </Link>{" "}
-                  and manage your preferences through{" "}
-                  <Link
-                    href="/cookies"
-                    className="font-medium text-violet-600 transition hover:text-violet-700"
-                  >
-                    Cookie Settings
-                  </Link>
-                  .
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                <div className="inline-flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[13px] font-semibold text-slate-700">
-                  Secure platform
-                </div>
-                <Link
-                  href="/cookies"
-                  className="inline-flex h-12 items-center rounded-2xl border border-violet-100 bg-violet-50 px-4 text-[13px] font-semibold text-violet-700 transition hover:bg-violet-100"
-                >
-                  Cookie Policy
-                </Link>
-                <Link
-                  href="/privacy"
-                  className="inline-flex h-12 items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[13px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-                >
-                  Privacy-first
-                </Link>
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-[12px] font-medium text-slate-500">
+                🔒 Secure platform
+              </span>
+              <span className="inline-flex h-7 items-center rounded-full border border-violet-100 bg-violet-50 px-3 text-[12px] font-medium text-violet-600">
+                Privacy-first
+              </span>
             </div>
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function FooterColumn({
-  title,
-  links,
-}: {
-  title: string;
-  links: { label: string; href: string }[];
-}) {
-  return (
-    <div>
-      <h3 className="text-[16px] font-semibold tracking-[-0.02em] text-slate-950">
-        {title}
-      </h3>
-
-      <div className="mt-5 flex flex-col gap-4">
-        {links.map((link) => (
-          <Link
-            key={`${title}-${link.label}`}
-            href={link.href}
-            className="w-fit text-[15px] text-slate-500 transition hover:text-violet-600"
-          >
-            {link.label}
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }
