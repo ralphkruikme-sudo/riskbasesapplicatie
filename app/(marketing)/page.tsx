@@ -119,153 +119,137 @@ function DotList({ items }: { items: string[] }) {
   );
 }
 
-function HeroTornadoObject() {
-  // Animated 3D-style purple tornado using layered SVG ribbons
-  const ribbons = [
-    { delay: 0,    dur: 8,  xOff: 0,   scaleX: 1.0, opacity: 0.95, blur: 0 },
-    { delay: 0.8,  dur: 9,  xOff: 6,   scaleX: 0.85, opacity: 0.80, blur: 0.5 },
-    { delay: 1.6,  dur: 10, xOff: -6,  scaleX: 0.70, opacity: 0.70, blur: 1 },
-    { delay: 2.4,  dur: 11, xOff: 10,  scaleX: 0.55, opacity: 0.55, blur: 1.5 },
-    { delay: 3.2,  dur: 12, xOff: -10, scaleX: 0.40, opacity: 0.40, blur: 2 },
-  ];
-
+function HeroRibbonObject() {
+  // Three smooth flowing silk ribbons like the Stripe reference — wide sweeping curves, full height
   return (
     <div
-      className="pointer-events-none absolute right-[-80px] top-1/2 hidden -translate-y-1/2 lg:block"
-      style={{ width: 340, height: 900, zIndex: 20 }}
+      className="pointer-events-none absolute right-[-180px] top-1/2 hidden -translate-y-1/2 lg:block"
+      style={{ width: 420, height: 960, zIndex: 20 }}
     >
-      {/* ambient glow behind tornado */}
+      {/* soft ambient glow */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 70% 60% at 50% 50%, rgba(99,91,255,0.22) 0%, rgba(140,120,255,0.10) 50%, transparent 80%)",
-          filter: "blur(24px)",
+            "radial-gradient(ellipse 80% 70% at 40% 50%, rgba(99,91,255,0.18) 0%, rgba(130,110,255,0.08) 55%, transparent 80%)",
+          filter: "blur(32px)",
         }}
       />
 
-      {ribbons.map((r, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            scaleX: [r.scaleX, r.scaleX * 1.12, r.scaleX],
-            x: [r.xOff, -r.xOff, r.xOff],
-            rotate: [i % 2 === 0 ? 2 : -2, i % 2 === 0 ? -2 : 2, i % 2 === 0 ? 2 : -2],
-          }}
-          transition={{
-            duration: r.dur,
-            delay: r.delay,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: 0,
-            width: "100%",
-            height: "100%",
-            translateX: "-50%",
-            transformOrigin: "50% 85%",
-            opacity: r.opacity,
-            filter: `blur(${r.blur}px)`,
-          }}
-        >
-          <svg
-            viewBox="0 0 340 900"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ width: "100%", height: "100%", overflow: "visible" }}
-          >
-            <defs>
-              <linearGradient id={`tg${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
-                <stop offset="8%"   stopColor={`rgba(${180 - i*20},${160 - i*15},255,0.25)`} />
-                <stop offset="22%"  stopColor={`rgba(${99 + i*8},${80 + i*6},255,${0.98 - i*0.08})`} />
-                <stop offset="38%"  stopColor="rgba(230,220,255,0.85)" />
-                <stop offset="50%"  stopColor={`rgba(${90 + i*10},${65 + i*8},255,${0.99 - i*0.06})`} />
-                <stop offset="65%"  stopColor="rgba(210,200,255,0.80)" />
-                <stop offset="78%"  stopColor={`rgba(${105 + i*8},${82 + i*7},255,${0.94 - i*0.07})`} />
-                <stop offset="90%"  stopColor={`rgba(${190 - i*18},${175 - i*14},255,0.28)`} />
-                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-              </linearGradient>
-              {/* sheen highlight overlay */}
-              <linearGradient id={`sh${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
-                <stop offset="15%"  stopColor="rgba(255,255,255,0.70)" />
-                <stop offset="28%"  stopColor="rgba(255,255,255,0.05)" />
-                <stop offset="48%"  stopColor="rgba(255,255,255,0.82)" />
-                <stop offset="64%"  stopColor="rgba(255,255,255,0.04)" />
-                <stop offset="84%"  stopColor="rgba(255,255,255,0.68)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-              </linearGradient>
-            </defs>
+      {/* RIBBON 1 — back, wide, slow */}
+      <motion.div
+        animate={{ rotate: [3, -3, 3], scaleX: [1, 1.04, 1] }}
+        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
+      >
+        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="r1g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+              <stop offset="10%"  stopColor="rgba(160,140,255,0.20)" />
+              <stop offset="28%"  stopColor="rgba(99,91,255,0.88)" />
+              <stop offset="46%"  stopColor="rgba(220,210,255,0.75)" />
+              <stop offset="62%"  stopColor="rgba(85,75,255,0.92)" />
+              <stop offset="80%"  stopColor="rgba(180,165,255,0.30)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+          </defs>
+          {/* wide flowing S-curve ribbon */}
+          <path
+            d="M 60 0 C 20 120, 360 200, 340 380 C 320 560, 60 620, 80 800 C 95 900, 200 940, 220 960 L 280 960 C 260 940, 160 900, 150 800 C 130 620, 390 560, 370 380 C 350 200, 10 120, 50 0 Z"
+            fill="url(#r1g)"
+            style={{ filter: "drop-shadow(0 0 28px rgba(99,91,255,0.30))" }}
+          />
+          {/* sheen highlight on ribbon 1 */}
+          <path
+            d="M 175 0 C 155 120, 250 200, 238 380 C 226 560, 155 620, 165 800 C 170 900, 200 940, 210 960 L 230 960 C 222 940, 194 900, 190 800 C 180 620, 252 560, 264 380 C 276 200, 182 120, 200 0 Z"
+            fill="rgba(255,255,255,0.55)"
+          />
+        </svg>
+      </motion.div>
 
-            {/* tornado body — wide at top, narrow at bottom */}
-            <path
-              d={`
-                M ${170 - 110 + i*16} 0
-                C ${170 - 120 + i*14} 80, ${170 + 120 - i*14} 120, ${170 + 110 - i*16} 180
-                C ${170 + 130 - i*12} 280, ${170 - 90 + i*12} 320, ${170 - 75 + i*10} 420
-                C ${170 - 90 + i*10} 520, ${170 + 80 - i*10} 560, ${170 + 65 - i*10} 660
-                C ${170 + 50 - i*8}  750, ${170 - 40 + i*8}  800, ${170 - 20 + i*4}  900
-                L ${170 + 20 - i*4}  900
-                C ${170 + 40 - i*8}  800, ${170 - 50 + i*8}  750, ${170 - 65 + i*10} 660
-                C ${170 - 80 + i*10} 560, ${170 + 90 - i*10} 520, ${170 + 75 - i*10} 420
-                C ${170 + 90 - i*12} 320, ${170 - 130 + i*12} 280, ${170 - 110 + i*16} 180
-                C ${170 - 120 + i*14} 120, ${170 + 120 - i*14} 80, ${170 + 110 - i*16} 0
-                Z
-              `}
-              fill={`url(#tg${i})`}
-              style={{
-                filter: `drop-shadow(0 0 ${20 - i*3}px rgba(99,91,255,${0.35 - i*0.04}))`,
-              }}
-            />
+      {/* RIBBON 2 — middle, offset phase */}
+      <motion.div
+        animate={{ rotate: [-4, 4, -4], scaleX: [0.88, 0.94, 0.88] }}
+        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
+      >
+        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="r2g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+              <stop offset="12%"  stopColor="rgba(140,125,255,0.18)" />
+              <stop offset="30%"  stopColor="rgba(108,98,255,0.82)" />
+              <stop offset="50%"  stopColor="rgba(240,235,255,0.80)" />
+              <stop offset="68%"  stopColor="rgba(95,82,255,0.86)" />
+              <stop offset="85%"  stopColor="rgba(195,182,255,0.25)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 110 0 C 300 80, 80 260, 120 420 C 160 580, 360 640, 320 800 C 300 900, 200 940, 185 960 L 240 960 C 258 940, 355 900, 375 800 C 415 640, 210 580, 170 420 C 130 260, 355 80, 165 0 Z"
+            fill="url(#r2g)"
+            style={{ filter: "drop-shadow(0 0 20px rgba(99,91,255,0.22))" }}
+            opacity={0.9}
+          />
+          <path
+            d="M 200 0 C 260 80, 170 260, 195 420 C 220 580, 280 640, 258 800 C 248 900, 215 940, 210 960 L 228 960 C 234 940, 262 900, 272 800 C 294 640, 234 580, 210 420 C 186 260, 278 80, 218 0 Z"
+            fill="rgba(255,255,255,0.50)"
+          />
+        </svg>
+      </motion.div>
 
-            {/* sheen highlight strip */}
-            <path
-              d={`
-                M ${170 - 18 + i*8} 0
-                C ${170 - 20 + i*6} 80, ${170 + 24 - i*6} 130, ${170 + 18 - i*8} 190
-                C ${170 + 28 - i*6} 290, ${170 - 18 + i*6} 330, ${170 - 14 + i*5} 430
-                C ${170 - 18 + i*5} 530, ${170 + 16 - i*5} 570, ${170 + 12 - i*5} 670
-                C ${170 + 10 - i*4} 760, ${170 - 8 + i*3}  810, ${170 - 4 + i*2}  900
-                L ${170 + 8 - i*2}  900
-                C ${170 + 10 - i*3} 810, ${170 - 12 + i*4} 760, ${170 - 14 + i*5} 670
-                C ${170 - 18 + i*5} 570, ${170 + 20 - i*5} 530, ${170 + 16 - i*5} 430
-                C ${170 + 22 - i*6} 330, ${170 - 24 + i*6} 290, ${170 - 20 + i*8} 190
-                C ${170 - 26 + i*6} 130, ${170 + 24 - i*6} 80, ${170 + 20 - i*8} 0
-                Z
-              `}
-              fill={`url(#sh${i})`}
-              opacity={0.6 - i * 0.08}
-            />
-          </svg>
-        </motion.div>
-      ))}
+      {/* RIBBON 3 — front, narrower, fastest */}
+      <motion.div
+        animate={{ rotate: [5, -2, 5], scaleX: [0.72, 0.80, 0.72] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 2.5 }}
+        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
+      >
+        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="r3g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+              <stop offset="15%"  stopColor="rgba(170,155,255,0.22)" />
+              <stop offset="32%"  stopColor="rgba(115,105,255,0.78)" />
+              <stop offset="52%"  stopColor="rgba(235,230,255,0.82)" />
+              <stop offset="70%"  stopColor="rgba(102,90,255,0.80)" />
+              <stop offset="87%"  stopColor="rgba(200,190,255,0.22)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 150 0 C 360 100, 50 300, 100 460 C 150 620, 380 660, 340 820 C 320 910, 210 945, 195 960 L 245 960 C 262 945, 368 910, 388 820 C 428 660, 198 620, 148 460 C 98 300, 408 100, 198 0 Z"
+            fill="url(#r3g)"
+            style={{ filter: "drop-shadow(0 0 14px rgba(99,91,255,0.18))" }}
+            opacity={0.82}
+          />
+          <path
+            d="M 210 0 C 290 100, 165 300, 185 460 C 205 620, 295 660, 275 820 C 265 910, 220 945, 215 960 L 230 960 C 236 945, 280 910, 290 820 C 310 660, 220 620, 200 460 C 180 300, 306 100, 226 0 Z"
+            fill="rgba(255,255,255,0.45)"
+          />
+        </svg>
+      </motion.div>
 
       {/* pixel shimmer dots */}
-      {[...Array(18)].map((_, i) => (
+      {[...Array(12)].map((_, i) => (
         <motion.div
           key={`px${i}`}
-          animate={{
-            opacity: [0, 1, 0],
-            scale: [0.5, 1.4, 0.5],
-          }}
+          animate={{ opacity: [0, 0.9, 0], scale: [0.6, 1.3, 0.6] }}
           transition={{
-            duration: 2.5 + (i % 4) * 0.8,
-            delay: (i * 0.37) % 3,
+            duration: 2.2 + (i % 4) * 0.7,
+            delay: (i * 0.41) % 3.5,
             repeat: Infinity,
             ease: "easeInOut",
           }}
           style={{
             position: "absolute",
-            left: `${15 + (i % 7) * 12}%`,
-            top: `${5 + Math.floor(i / 7) * 30 + (i % 3) * 8}%`,
-            width: i % 3 === 0 ? 4 : 2,
-            height: i % 3 === 0 ? 4 : 2,
+            left: `${18 + (i % 5) * 16}%`,
+            top: `${8 + Math.floor(i / 4) * 32 + (i % 3) * 5}%`,
+            width: i % 3 === 0 ? 3 : 2,
+            height: i % 3 === 0 ? 3 : 2,
             borderRadius: 1,
-            background: `rgba(${180 + (i % 3) * 25},${160 + (i % 4) * 15},255,0.9)`,
-            boxShadow: `0 0 ${6 + (i % 3) * 4}px rgba(99,91,255,0.8)`,
+            background: `rgba(180,165,255,0.95)`,
+            boxShadow: `0 0 ${5 + (i % 3) * 4}px rgba(99,91,255,0.85)`,
           }}
         />
       ))}
@@ -360,7 +344,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <HeroTornadoObject />
+              <HeroRibbonObject />
             </motion.div>
           </div>
         </div>
