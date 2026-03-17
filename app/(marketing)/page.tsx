@@ -119,90 +119,156 @@ function DotList({ items }: { items: string[] }) {
   );
 }
 
-function HeroRibbonObject() {
+function HeroTornadoObject() {
+  // Animated 3D-style purple tornado using layered SVG ribbons
+  const ribbons = [
+    { delay: 0,    dur: 8,  xOff: 0,   scaleX: 1.0, opacity: 0.95, blur: 0 },
+    { delay: 0.8,  dur: 9,  xOff: 6,   scaleX: 0.85, opacity: 0.80, blur: 0.5 },
+    { delay: 1.6,  dur: 10, xOff: -6,  scaleX: 0.70, opacity: 0.70, blur: 1 },
+    { delay: 2.4,  dur: 11, xOff: 10,  scaleX: 0.55, opacity: 0.55, blur: 1.5 },
+    { delay: 3.2,  dur: 12, xOff: -10, scaleX: 0.40, opacity: 0.40, blur: 2 },
+  ];
+
   return (
-    <div className="pointer-events-none absolute right-[-220px] top-1/2 hidden h-[820px] w-[640px] -translate-y-1/2 lg:block">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_50%,rgba(99,91,255,0.16)_0%,rgba(99,91,255,0.08)_24%,rgba(255,255,255,0)_68%)] blur-3xl" />
+    <div
+      className="pointer-events-none absolute right-[-80px] top-1/2 hidden -translate-y-1/2 lg:block"
+      style={{ width: 340, height: 900, zIndex: 20 }}
+    >
+      {/* ambient glow behind tornado */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 60% at 50% 50%, rgba(99,91,255,0.22) 0%, rgba(140,120,255,0.10) 50%, transparent 80%)",
+          filter: "blur(24px)",
+        }}
+      />
 
-      {/* wide back ribbon */}
-      <motion.div
-        animate={{ rotate: [26, 32, 26], y: [0, -10, 0] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-[28%] top-[6%] h-[88%] w-[220px]"
-      >
-        <div
-          className="absolute inset-0 opacity-80 blur-[0.5px]"
+      {ribbons.map((r, i) => (
+        <motion.div
+          key={i}
+          animate={{
+            scaleX: [r.scaleX, r.scaleX * 1.12, r.scaleX],
+            x: [r.xOff, -r.xOff, r.xOff],
+            rotate: [i % 2 === 0 ? 2 : -2, i % 2 === 0 ? -2 : 2, i % 2 === 0 ? 2 : -2],
+          }}
+          transition={{
+            duration: r.dur,
+            delay: r.delay,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
           style={{
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(213,203,255,0.24) 8%, rgba(118,94,255,0.90) 26%, rgba(241,236,255,0.80) 48%, rgba(120,95,255,0.94) 68%, rgba(207,198,255,0.26) 88%, rgba(255,255,255,0) 100%)",
-            clipPath:
-              "polygon(20% 0%, 66% 0%, 100% 14%, 78% 36%, 54% 50%, 80% 68%, 100% 86%, 70% 100%, 24% 100%, 0% 88%, 14% 66%, 38% 48%, 12% 24%, 0% 10%)",
-            transform: "rotate(18deg) skewY(4deg)",
-            borderRadius: "999px",
-            boxShadow:
-              "0 0 36px rgba(99,91,255,0.14), 0 0 120px rgba(99,91,255,0.10)",
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            width: "100%",
+            height: "100%",
+            translateX: "-50%",
+            transformOrigin: "50% 85%",
+            opacity: r.opacity,
+            filter: `blur(${r.blur}px)`,
+          }}
+        >
+          <svg
+            viewBox="0 0 340 900"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ width: "100%", height: "100%", overflow: "visible" }}
+          >
+            <defs>
+              <linearGradient id={`tg${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+                <stop offset="8%"   stopColor={`rgba(${180 - i*20},${160 - i*15},255,0.25)`} />
+                <stop offset="22%"  stopColor={`rgba(${99 + i*8},${80 + i*6},255,${0.98 - i*0.08})`} />
+                <stop offset="38%"  stopColor="rgba(230,220,255,0.85)" />
+                <stop offset="50%"  stopColor={`rgba(${90 + i*10},${65 + i*8},255,${0.99 - i*0.06})`} />
+                <stop offset="65%"  stopColor="rgba(210,200,255,0.80)" />
+                <stop offset="78%"  stopColor={`rgba(${105 + i*8},${82 + i*7},255,${0.94 - i*0.07})`} />
+                <stop offset="90%"  stopColor={`rgba(${190 - i*18},${175 - i*14},255,0.28)`} />
+                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+              </linearGradient>
+              {/* sheen highlight overlay */}
+              <linearGradient id={`sh${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
+                <stop offset="15%"  stopColor="rgba(255,255,255,0.70)" />
+                <stop offset="28%"  stopColor="rgba(255,255,255,0.05)" />
+                <stop offset="48%"  stopColor="rgba(255,255,255,0.82)" />
+                <stop offset="64%"  stopColor="rgba(255,255,255,0.04)" />
+                <stop offset="84%"  stopColor="rgba(255,255,255,0.68)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+              </linearGradient>
+            </defs>
+
+            {/* tornado body — wide at top, narrow at bottom */}
+            <path
+              d={`
+                M ${170 - 110 + i*16} 0
+                C ${170 - 120 + i*14} 80, ${170 + 120 - i*14} 120, ${170 + 110 - i*16} 180
+                C ${170 + 130 - i*12} 280, ${170 - 90 + i*12} 320, ${170 - 75 + i*10} 420
+                C ${170 - 90 + i*10} 520, ${170 + 80 - i*10} 560, ${170 + 65 - i*10} 660
+                C ${170 + 50 - i*8}  750, ${170 - 40 + i*8}  800, ${170 - 20 + i*4}  900
+                L ${170 + 20 - i*4}  900
+                C ${170 + 40 - i*8}  800, ${170 - 50 + i*8}  750, ${170 - 65 + i*10} 660
+                C ${170 - 80 + i*10} 560, ${170 + 90 - i*10} 520, ${170 + 75 - i*10} 420
+                C ${170 + 90 - i*12} 320, ${170 - 130 + i*12} 280, ${170 - 110 + i*16} 180
+                C ${170 - 120 + i*14} 120, ${170 + 120 - i*14} 80, ${170 + 110 - i*16} 0
+                Z
+              `}
+              fill={`url(#tg${i})`}
+              style={{
+                filter: `drop-shadow(0 0 ${20 - i*3}px rgba(99,91,255,${0.35 - i*0.04}))`,
+              }}
+            />
+
+            {/* sheen highlight strip */}
+            <path
+              d={`
+                M ${170 - 18 + i*8} 0
+                C ${170 - 20 + i*6} 80, ${170 + 24 - i*6} 130, ${170 + 18 - i*8} 190
+                C ${170 + 28 - i*6} 290, ${170 - 18 + i*6} 330, ${170 - 14 + i*5} 430
+                C ${170 - 18 + i*5} 530, ${170 + 16 - i*5} 570, ${170 + 12 - i*5} 670
+                C ${170 + 10 - i*4} 760, ${170 - 8 + i*3}  810, ${170 - 4 + i*2}  900
+                L ${170 + 8 - i*2}  900
+                C ${170 + 10 - i*3} 810, ${170 - 12 + i*4} 760, ${170 - 14 + i*5} 670
+                C ${170 - 18 + i*5} 570, ${170 + 20 - i*5} 530, ${170 + 16 - i*5} 430
+                C ${170 + 22 - i*6} 330, ${170 - 24 + i*6} 290, ${170 - 20 + i*8} 190
+                C ${170 - 26 + i*6} 130, ${170 + 24 - i*6} 80, ${170 + 20 - i*8} 0
+                Z
+              `}
+              fill={`url(#sh${i})`}
+              opacity={0.6 - i * 0.08}
+            />
+          </svg>
+        </motion.div>
+      ))}
+
+      {/* pixel shimmer dots */}
+      {[...Array(18)].map((_, i) => (
+        <motion.div
+          key={`px${i}`}
+          animate={{
+            opacity: [0, 1, 0],
+            scale: [0.5, 1.4, 0.5],
+          }}
+          transition={{
+            duration: 2.5 + (i % 4) * 0.8,
+            delay: (i * 0.37) % 3,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{
+            position: "absolute",
+            left: `${15 + (i % 7) * 12}%`,
+            top: `${5 + Math.floor(i / 7) * 30 + (i % 3) * 8}%`,
+            width: i % 3 === 0 ? 4 : 2,
+            height: i % 3 === 0 ? 4 : 2,
+            borderRadius: 1,
+            background: `rgba(${180 + (i % 3) * 25},${160 + (i % 4) * 15},255,0.9)`,
+            boxShadow: `0 0 ${6 + (i % 3) * 4}px rgba(99,91,255,0.8)`,
           }}
         />
-      </motion.div>
-
-      {/* main front ribbon */}
-      <motion.div
-        animate={{ rotate: [8, 14, 8], y: [0, 8, 0] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-[43%] top-[0%] h-[100%] w-[170px]"
-      >
-        <div
-          className="absolute inset-0 opacity-96 blur-[0.35px]"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(196,184,255,0.28) 8%, rgba(110,84,255,0.98) 22%, rgba(255,255,255,0.88) 40%, rgba(105,79,255,0.99) 58%, rgba(230,224,255,0.60) 80%, rgba(255,255,255,0) 100%)",
-            clipPath:
-              "polygon(26% 0%, 72% 0%, 100% 12%, 86% 28%, 62% 50%, 86% 73%, 100% 88%, 72% 100%, 26% 100%, 0% 86%, 14% 68%, 40% 48%, 14% 24%, 0% 10%)",
-            transform: "rotate(10deg) skewY(2deg)",
-            borderRadius: "999px",
-            boxShadow:
-              "0 0 40px rgba(99,91,255,0.18), 0 0 160px rgba(99,91,255,0.14)",
-          }}
-        />
-      </motion.div>
-
-      {/* glossy highlight */}
-      <motion.div
-        animate={{ rotate: [10, 15, 10], y: [0, -6, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-[49%] top-[2%] h-[96%] w-[88px]"
-      >
-        <div
-          className="absolute inset-0 opacity-95 blur-[0.2px]"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.86) 14%, rgba(255,255,255,0.14) 28%, rgba(255,255,255,0.98) 48%, rgba(255,255,255,0.18) 66%, rgba(255,255,255,0.82) 86%, rgba(255,255,255,0) 100%)",
-            clipPath:
-              "polygon(34% 0%, 70% 0%, 100% 14%, 82% 34%, 58% 50%, 82% 67%, 100% 86%, 68% 100%, 34% 100%, 0% 86%, 18% 66%, 42% 48%, 18% 28%, 0% 12%)",
-            transform: "rotate(9deg) skewY(2deg)",
-            borderRadius: "999px",
-          }}
-        />
-      </motion.div>
-
-      {/* far side ribbon */}
-      <motion.div
-        animate={{ rotate: [-14, -20, -14], y: [0, 10, 0] }}
-        transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-[58%] top-[10%] h-[84%] w-[150px]"
-      >
-        <div
-          className="absolute inset-0 opacity-78 blur-[0.4px]"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(228,220,255,0.20) 12%, rgba(139,115,255,0.84) 34%, rgba(244,240,255,0.76) 54%, rgba(128,103,255,0.86) 74%, rgba(255,255,255,0) 100%)",
-            clipPath:
-              "polygon(24% 0%, 66% 0%, 100% 16%, 78% 38%, 56% 52%, 80% 68%, 100% 86%, 68% 100%, 24% 100%, 0% 86%, 20% 64%, 42% 48%, 18% 28%, 0% 10%)",
-            transform: "rotate(-14deg) skewY(-6deg)",
-            borderRadius: "999px",
-          }}
-        />
-      </motion.div>
+      ))}
     </div>
   );
 }
@@ -269,7 +335,7 @@ export default function HomePage() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, amount: 0.15 }}
-              className="relative min-h-[760px] overflow-visible pr-[320px]"
+              className="relative min-h-[760px] overflow-visible"
             >
               <div className="relative z-10">
                 <div className="ml-auto max-w-[980px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
@@ -294,7 +360,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <HeroRibbonObject />
+              <HeroTornadoObject />
             </motion.div>
           </div>
         </div>
