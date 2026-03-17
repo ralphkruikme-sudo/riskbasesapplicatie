@@ -3,80 +3,268 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-const navItems = [
-  { label: "Product", href: "/" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Features", href: "/features" },
-  { label: "Resources", href: "/resources" },
+type DropdownItem = {
+  label: string;
+  href: string;
+};
+
+type NavItemType = {
+  label: string;
+  href: string;
+  dropdown: DropdownItem[] | null;
+};
+
+const navItems: NavItemType[] = [
+  {
+    label: "Product",
+    href: "/",
+    dropdown: [
+      {
+        label: "Platform Overview",
+        href: "/",
+      },
+      {
+        label: "Risk Register",
+        href: "/features/risk-register",
+      },
+      {
+        label: "Action Management",
+        href: "/features/actions",
+      },
+      {
+        label: "Stakeholder Management",
+        href: "/features/stakeholders",
+      },
+      {
+        label: "Reports & Dashboards",
+        href: "/features/reports",
+      },
+      {
+        label: "AI Risk Generation",
+        href: "/features/ai",
+      },
+    ],
+  },
+  {
+    label: "Solutions",
+    href: "/solutions",
+    dropdown: [
+      {
+        label: "Construction",
+        href: "/solutions/construction",
+      },
+      {
+        label: "Infrastructure",
+        href: "/solutions/infrastructure",
+      },
+      {
+        label: "Maritime & Offshore",
+        href: "/solutions/maritime",
+      },
+      {
+        label: "Enterprise Teams",
+        href: "/solutions/enterprise",
+      },
+    ],
+  },
+  {
+    label: "Pricing",
+    href: "/pricing",
+    dropdown: null,
+  },
+  {
+    label: "Resources",
+    href: "/resources",
+    dropdown: [
+      {
+        label: "Documentation",
+        href: "/documentation",
+      },
+      {
+        label: "Case Studies",
+        href: "/case-studies",
+      },
+      {
+        label: "Blog",
+        href: "/blog",
+      },
+    ],
+  },
+  {
+    label: "About",
+    href: "/about",
+    dropdown: null,
+  },
 ];
+
+function DropdownMenu({ items }: { items: DropdownItem[] }) {
+  return (
+    <div className="absolute left-1/2 top-full z-50 mt-4 w-[320px] -translate-x-1/2">
+      <div
+        className="
+          relative overflow-hidden rounded-2xl bg-white p-2
+          border border-violet-500/30
+          shadow-[0_24px_70px_rgba(46,49,146,0.14)]
+        "
+      >
+        <div className="absolute -top-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-l border-t border-violet-500/30 bg-white" />
+
+        {items.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="group flex items-center justify-between rounded-xl px-5 py-4 transition duration-200 hover:bg-slate-50"
+          >
+            <span className="text-[15px] font-semibold text-slate-900 transition group-hover:text-violet-600">
+              {item.label}
+            </span>
+
+            <ArrowRight className="h-4 w-4 shrink-0 text-violet-500/80 transition duration-200 group-hover:translate-x-0.5 group-hover:text-violet-600" />
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NavItem({
+  item,
+  isActive,
+}: {
+  item: NavItemType;
+  isActive: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const activeClass = "text-violet-700";
+  const inactiveClass = "text-slate-700 hover:text-slate-950";
+
+  if (!item.dropdown) {
+    return (
+      <Link
+        href={item.href}
+        className={`relative inline-flex h-[82px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+          isActive ? activeClass : inactiveClass
+        }`}
+      >
+        {item.label}
+        {isActive && (
+          <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+        )}
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="relative flex h-[82px] items-center"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`relative inline-flex h-full items-center gap-1.5 text-[15px] font-semibold transition-colors duration-200 ${
+          isActive || open ? activeClass : inactiveClass
+        }`}
+      >
+        <span>{item.label}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+        {(isActive || open) && (
+          <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+        )}
+      </button>
+
+      {open && item.dropdown && <DropdownMenu items={item.dropdown} />}
+    </div>
+  );
+}
 
 export default function MarketingHeader() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
-      <div className="grid h-[72px] grid-cols-[auto_1fr_auto] items-center px-6 lg:px-10">
-        {/* Logo — groter, verticaal gecentreerd */}
-        <Link href="/" className="flex items-center gap-3 justify-self-start">
-          <Image
-            src="/logo-icon.png"
-            alt="RiskBases logo"
-            width={36}
-            height={36}
-            className="h-9 w-9 object-contain"
-            priority
-          />
-          <span className="text-[22px] font-bold tracking-[-0.05em] text-slate-950">
-            RiskBases
-          </span>
-        </Link>
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      <div className="mx-auto grid h-[82px] max-w-[1440px] grid-cols-[auto_1fr_auto] items-center px-6 sm:px-8 lg:px-10">
+        {/* Left */}
+        <div className="justify-self-start">
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/logo-icon.png"
+              alt="RiskBases logo"
+              width={44}
+              height={44}
+              className="h-[44px] w-[44px] object-contain"
+              priority
+            />
+            <span className="text-[23px] font-bold tracking-[-0.04em] text-slate-950">
+              RiskBases
+            </span>
+          </Link>
+        </div>
 
-        {/* Nav — zelfde verticale baseline als logo */}
+        {/* Center */}
         <nav className="hidden justify-center lg:flex">
-          <div className="flex items-center gap-10">
+          <div className="flex items-center gap-9">
             {navItems.map((item) => {
               const isActive =
                 item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+                  ? pathname === "/" || pathname.startsWith("/features")
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`relative text-[15px] font-medium transition ${
-                    isActive
-                      ? "text-slate-950"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  {item.label}
-                  {isActive && (
-                    <span className="absolute -bottom-[26px] left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-500" />
-                  )}
-                </Link>
-              );
+              return <NavItem key={item.label} item={item} isActive={isActive} />;
             })}
           </div>
         </nav>
 
-        {/* CTA buttons */}
-        <div className="hidden items-center gap-3 justify-self-end lg:flex">
+        {/* Right */}
+        <div className="hidden items-center justify-self-end gap-6 pl-12 lg:flex">
+          <Link
+            href="/contact"
+            className={`relative inline-flex h-[82px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+              pathname === "/contact" || pathname.startsWith("/contact/")
+                ? "text-violet-700"
+                : "text-slate-700 hover:text-slate-950"
+            }`}
+          >
+            Contact Us
+            {(pathname === "/contact" || pathname.startsWith("/contact/")) && (
+              <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+            )}
+          </Link>
+
           <Link
             href="/auth"
-            className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-[15px] font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+            className="text-[15px] font-semibold text-violet-700 transition hover:text-violet-800"
           >
-            Sign up
+            Login
           </Link>
 
           <Link
             href="/book-demo"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 px-6 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(109,40,217,0.28)] transition hover:scale-[1.02] hover:shadow-[0_12px_32px_rgba(109,40,217,0.36)]"
+            className="inline-flex items-center rounded-full bg-violet-600 px-5 py-2.5 text-[14px] font-semibold text-white shadow-[0_10px_30px_rgba(124,58,237,0.20)] transition hover:bg-violet-700"
           >
             Book a demo
-            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </div>

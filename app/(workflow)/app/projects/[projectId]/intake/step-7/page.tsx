@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useParams, useRouter } from "next/navigation";
-import { Sparkles, X, Check, Loader2, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Sparkles,
+  Loader2,
+  Check,
+  AlertTriangle,
+  X,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  Brain,
+} from "lucide-react";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,16 +21,29 @@ const supabase = createClient(
 );
 
 type Project = {
-  id: string; name: string; description: string | null;
-  project_type: string | null; contract_type: string | null;
-  project_value: string | null; start_date: string | null; end_date: string | null;
-  client_name: string | null; country: string | null; region: string | null;
-  city: string | null; site_type: string | null; permit_required: boolean | null;
-  project_phase: string | null; key_milestones: string | null;
-  critical_dependencies: string | null; initial_risks: string | null;
+  id: string;
+  name: string;
+  description: string | null;
+  project_type: string | null;
+  contract_type: string | null;
+  project_value: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  client_name: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  site_type: string | null;
+  permit_required: boolean | null;
+  project_phase: string | null;
+  key_milestones: string | null;
+  critical_dependencies: string | null;
+  initial_risks: string | null;
   selected_risk_categories: string | null;
-  client_stakeholder: string | null; authority_stakeholder: string | null;
-  main_contractor: string | null; subcontractors: string | null;
+  client_stakeholder: string | null;
+  authority_stakeholder: string | null;
+  main_contractor: string | null;
+  subcontractors: string | null;
 };
 
 type GeneratedRisk = {
@@ -32,144 +55,29 @@ type GeneratedRisk = {
   score: number;
   level: "low" | "medium" | "high";
   suggested_action: string;
+  source_type: "template" | "ai";
+  source_template_id?: string | null;
+  generation_reason?: string | null;
   selected: boolean;
 };
 
-const riskCategories = [
-  "Permits", "Planning", "Financial", "Safety", "Environment",
-  "Suppliers", "Technical", "Stakeholders", "Weather", "Utilities",
-  "Quality", "Contractual",
-];
-
-// ── AI Review Modal ───────────────────────────────────────────────────────────
-function AIReviewModal({ risks, onClose, onConfirm, saving }: {
-  risks: GeneratedRisk[];
-  onClose: () => void;
-  onConfirm: (risks: GeneratedRisk[]) => void;
-  saving: boolean;
-}) {
-  const [localRisks, setLocalRisks] = useState(risks);
-  const [expanded, setExpanded] = useState<number | null>(null);
-
-  function toggle(i: number) {
-    setLocalRisks(prev => prev.map((r, idx) => idx === i ? { ...r, selected: !r.selected } : r));
+function levelClasses(level: GeneratedRisk["level"]) {
+  if (level === "high") {
+    return "border-red-200 bg-red-50 text-red-700";
   }
-  function toggleAll(val: boolean) {
-    setLocalRisks(prev => prev.map(r => ({ ...r, selected: val })));
+  if (level === "medium") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
-
-  const selectedCount = localRisks.filter(r => r.selected).length;
-
-  const levelColor = (l: string) =>
-    l === "high" ? { bg: "#fef2f2", text: "#dc2626", border: "#fecaca", dot: "#ef4444" } :
-    l === "medium" ? { bg: "#fffbeb", text: "#d97706", border: "#fde68a", dot: "#f59e0b" } :
-    { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0", dot: "#22c55e" };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width: "100%", maxWidth: 680, maxHeight: "90vh", background: "white", borderRadius: 24, border: "1px solid #e8eaf0", boxShadow: "0 32px 80px rgba(15,23,42,0.2)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-        {/* Header */}
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ height: 40, width: 40, borderRadius: 12, background: "linear-gradient(135deg, #7c3aed, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Sparkles style={{ height: 20, width: 20, color: "white" }} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>AI gegenereerde risico's</h3>
-              <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 1 }}>{localRisks.length} risico's gevonden · selecteer wat je wil bewaren</p>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ height: 32, width: 32, borderRadius: 8, border: "none", background: "#f8fafc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <X style={{ height: 15, width: 15, color: "#64748b" }} />
-          </button>
-        </div>
-
-        {/* Select all / none */}
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f8fafc", display: "flex", alignItems: "center", gap: 12, flexShrink: 0, background: "#fafafa" }}>
-          <button onClick={() => toggleAll(true)} style={{ fontSize: 12, fontWeight: 600, color: "#7c3aed", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}>Alles selecteren</button>
-          <span style={{ color: "#e2e8f0" }}>|</span>
-          <button onClick={() => toggleAll(false)} style={{ fontSize: 12, fontWeight: 600, color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}>Alles deselecteren</button>
-          <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}><strong style={{ color: "#7c3aed" }}>{selectedCount}</strong> van {localRisks.length} geselecteerd</span>
-        </div>
-
-        {/* Risk list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-          {localRisks.map((risk, i) => {
-            const lc = levelColor(risk.level);
-            const isOpen = expanded === i;
-            return (
-              <div key={i} style={{
-                borderRadius: 14, border: `1.5px solid ${risk.selected ? "#c4b5fd" : "#e8eaf0"}`,
-                background: risk.selected ? "#faf8ff" : "white", marginBottom: 8,
-                transition: "border-color 150ms, background 150ms",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer" }}
-                  onClick={() => toggle(i)}>
-                  {/* Checkbox */}
-                  <div style={{
-                    height: 22, width: 22, borderRadius: 6, border: `2px solid ${risk.selected ? "#7c3aed" : "#d1d5db"}`,
-                    background: risk.selected ? "#7c3aed" : "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 150ms",
-                  }}>
-                    {risk.selected && <Check style={{ height: 12, width: 12, color: "white" }} />}
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                      <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: lc.bg, color: lc.text, border: `1px solid ${lc.border}` }}>{risk.level.toUpperCase()}</span>
-                      <span style={{ fontSize: 11, color: "#94a3b8", background: "#f8fafc", padding: "2px 8px", borderRadius: 20 }}>{risk.category}</span>
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>Score: <strong style={{ color: lc.text }}>{risk.score}</strong></span>
-                    </div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{risk.title}</p>
-                  </div>
-
-                  {/* Expand */}
-                  <button onClick={e => { e.stopPropagation(); setExpanded(isOpen ? null : i); }}
-                    style={{ height: 28, width: 28, borderRadius: 8, border: "1px solid #e8eaf0", background: "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {isOpen ? <ChevronUp style={{ height: 13, width: 13, color: "#64748b" }} /> : <ChevronDown style={{ height: 13, width: 13, color: "#64748b" }} />}
-                  </button>
-                </div>
-
-                {/* Expanded detail */}
-                {isOpen && (
-                  <div style={{ padding: "0 16px 14px 50px", display: "flex", flexDirection: "column", gap: 8 }}>
-                    <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>{risk.description}</p>
-                    <div style={{ background: "#f8fafc", borderRadius: 10, padding: "10px 12px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                      <div><p style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>KANS</p><p style={{ fontSize: 16, fontWeight: 800, color: "#374151" }}>{risk.probability}/5</p></div>
-                      <div><p style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>IMPACT</p><p style={{ fontSize: 16, fontWeight: 800, color: "#374151" }}>{risk.impact}/5</p></div>
-                      <div><p style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>SCORE</p><p style={{ fontSize: 16, fontWeight: 800, color: lc.text }}>{risk.score}</p></div>
-                    </div>
-                    <div style={{ background: "#ede9fb", borderRadius: 10, padding: "10px 12px" }}>
-                      <p style={{ fontSize: 10, color: "#7c3aed", fontWeight: 700, marginBottom: 3 }}>💡 AANBEVOLEN ACTIE</p>
-                      <p style={{ fontSize: 13, color: "#374151" }}>{risk.suggested_action}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: "16px 24px", borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <p style={{ fontSize: 13, color: "#94a3b8" }}>
-            {selectedCount === 0 ? "Selecteer minimaal 1 risico" : `${selectedCount} risico${selectedCount === 1 ? "" : "'s"} worden opgeslagen`}
-          </p>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose} style={{ height: 40, borderRadius: 10, border: "1px solid #e2e8f0", background: "white", padding: "0 18px", fontSize: 13, fontWeight: 600, color: "#374151", cursor: "pointer" }}>Annuleren</button>
-            <button onClick={() => onConfirm(localRisks.filter(r => r.selected))} disabled={saving || selectedCount === 0}
-              style={{ height: 40, borderRadius: 10, border: "none", background: selectedCount > 0 ? "linear-gradient(135deg, #7c3aed, #6d28d9)" : "#e2e8f0", padding: "0 22px", fontSize: 13, fontWeight: 700, color: selectedCount > 0 ? "white" : "#94a3b8", cursor: selectedCount > 0 ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 8 }}>
-              {saving ? <><Loader2 style={{ height: 14, width: 14, animation: "spin 1s linear infinite" }} /> Opslaan...</> : `✓ ${selectedCount} risico${selectedCount === 1 ? "" : "'s"} opslaan`}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+function sourceClasses(source: GeneratedRisk["source_type"]) {
+  if (source === "template") {
+    return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+  return "border-violet-200 bg-violet-100 text-violet-700";
+}
+
 export default function Step7Page() {
   const params = useParams();
   const router = useRouter();
@@ -177,347 +85,592 @@ export default function Step7Page() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [initialRisks, setInitialRisks] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-
-  // AI state
+  const [savingStep, setSavingStep] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [generatedRisks, setGeneratedRisks] = useState<GeneratedRisk[] | null>(null);
   const [savingRisks, setSavingRisks] = useState(false);
-  const [aiError, setAiError] = useState("");
-  const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const [generatedRisks, setGeneratedRisks] = useState<GeneratedRisk[]>([]);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   useEffect(() => {
     async function loadProject() {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, description, project_type, contract_type, project_value, start_date, end_date, client_name, country, region, city, site_type, permit_required, project_phase, key_milestones, critical_dependencies, initial_risks, selected_risk_categories, client_stakeholder, authority_stakeholder, main_contractor, subcontractors")
+        .select(`
+          id,
+          name,
+          description,
+          project_type,
+          contract_type,
+          project_value,
+          start_date,
+          end_date,
+          client_name,
+          country,
+          region,
+          city,
+          site_type,
+          permit_required,
+          project_phase,
+          key_milestones,
+          critical_dependencies,
+          initial_risks,
+          selected_risk_categories,
+          client_stakeholder,
+          authority_stakeholder,
+          main_contractor,
+          subcontractors
+        `)
         .eq("id", projectId)
         .single();
 
-      if (error) { setMessage("Could not load project."); setLoading(false); return; }
-      setProject(data);
-      setInitialRisks(data.initial_risks || "");
-      if (data.selected_risk_categories) {
-        setSelectedCategories(data.selected_risk_categories.split(",").map((s: string) => s.trim()).filter(Boolean));
+      if (error) {
+        setMessage(error.message || "Could not load step 7.");
+        setLoading(false);
+        return;
       }
+
+      setProject(data);
       setLoading(false);
     }
-    if (projectId) loadProject();
+
+    if (projectId) {
+      loadProject();
+    }
   }, [projectId]);
 
-  function toggleCategory(cat: string) {
-    setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
-  }
-
   async function saveStep() {
-    return (await supabase.from("projects").update({
-      initial_risks: initialRisks || null,
-      selected_risk_categories: selectedCategories.length > 0 ? selectedCategories.join(", ") : null,
-    }).eq("id", projectId)).error;
+    setSavingStep(true);
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", projectId);
+
+    setSavingStep(false);
+
+    if (error) {
+      throw new Error(error.message || "Could not save step.");
+    }
   }
 
-  async function handleGenerateAI() {
+  async function handleGenerateRisks() {
     if (!project) return;
+
     setGenerating(true);
-    setAiError("");
-    setSavedCount(null);
-
-    // First save current state
-    await saveStep();
-
-    // Build context prompt from all project data
-    const ctx = [
-      `Project naam: ${project.name}`,
-      project.description ? `Beschrijving: ${project.description}` : null,
-      project.project_type ? `Type: ${project.project_type}` : null,
-      project.contract_type ? `Contract: ${project.contract_type}` : null,
-      project.project_value ? `Waarde: €${project.project_value}` : null,
-      project.client_name ? `Opdrachtgever: ${project.client_name}` : null,
-      project.city ? `Locatie: ${project.city}${project.region ? `, ${project.region}` : ""}` : null,
-      project.site_type ? `Omgeving: ${project.site_type}` : null,
-      project.permit_required !== null ? `Vergunningen vereist: ${project.permit_required ? "ja" : "nee"}` : null,
-      project.project_phase ? `Fase: ${project.project_phase}` : null,
-      project.key_milestones ? `Mijlpalen: ${project.key_milestones}` : null,
-      project.critical_dependencies ? `Afhankelijkheden: ${project.critical_dependencies}` : null,
-      project.client_stakeholder ? `Opdrachtgever stakeholder: ${project.client_stakeholder}` : null,
-      project.authority_stakeholder ? `Bevoegd gezag: ${project.authority_stakeholder}` : null,
-      project.main_contractor ? `Hoofdaannemer: ${project.main_contractor}` : null,
-      project.subcontractors ? `Onderaannemers: ${project.subcontractors}` : null,
-      selectedCategories.length > 0 ? `Relevante categorieën: ${selectedCategories.join(", ")}` : null,
-      initialRisks ? `Door gebruiker genoemde risico's: ${initialRisks}` : null,
-    ].filter(Boolean).join("\n");
-
-    const prompt = `Je bent een expert risicomanager voor bouw- en infra projecten in Nederland.
-
-Analyseer dit project en genereer een professionele lijst van 10-15 specifieke risico's.
-
-PROJECTINFORMATIE:
-${ctx}
-
-Geef je antwoord ALLEEN als geldige JSON array, geen uitleg, geen markdown, geen backticks.
-Elke item heeft exact deze velden:
-{
-  "title": "Korte risicotitel (max 60 tekens)",
-  "description": "Duidelijke beschrijving van het risico en waarom het relevant is voor dit project (2-3 zinnen)",
-  "category": "één van: Permits, Planning, Financial, Safety, Environment, Suppliers, Technical, Stakeholders, Weather, Utilities, Quality, Contractual",
-  "probability": getal 1-5,
-  "impact": getal 1-5,
-  "score": probability * impact,
-  "level": "low" als score <= 6, "medium" als score 7-14, "high" als score >= 15,
-  "suggested_action": "Concrete aanbevolen beheermaatregel (1 zin)"
-}
-
-Zorg dat de risico's specifiek zijn voor dit project, niet generiek. Varieer in categorieën. Gebruik de door de gebruiker genoemde risico's als extra input maar voeg ook andere toe.`;
+    setMessage("");
+    setGeneratedRisks([]);
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      await saveStep();
+
+      const response = await fetch(`/api/projects/${projectId}/generate-risks`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          messages: [{ role: "user", content: prompt }],
-        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error?.message || `API error ${response.status}`);
+        throw new Error(data?.error || "Risk generation failed.");
       }
 
-      const text = data.content?.find((b: any) => b.type === "text")?.text || "";
-      // Strip any accidental markdown fences
-      const clean = text.replace(/```json|```/gi, "").trim();
-      const parsed: GeneratedRisk[] = JSON.parse(clean);
-
-      // Mark all selected by default, ensure score/level
-      const withSelected = parsed.map(r => ({
-        ...r,
-        score: r.probability * r.impact,
-        level: (r.probability * r.impact >= 15 ? "high" : r.probability * r.impact >= 7 ? "medium" : "low") as "low" | "medium" | "high",
+      const combined: GeneratedRisk[] = (data.combined || []).map((risk: any) => ({
+        ...risk,
         selected: true,
       }));
 
-      setGeneratedRisks(withSelected);
-    } catch (e: any) {
-      setAiError(e?.message || "AI generatie mislukt. Probeer opnieuw.");
+      setGeneratedRisks(combined);
+      setExpandedIndex(combined.length > 0 ? 0 : null);
+
+      if (combined.length === 0) {
+        setMessage("No risks were generated yet.");
+      }
+    } catch (error: any) {
+      setMessage(error?.message || "Could not generate risks.");
     } finally {
       setGenerating(false);
     }
   }
 
-  async function handleSaveRisks(selected: GeneratedRisk[]) {
+  function toggleRisk(index: number) {
+    setGeneratedRisks((prev) =>
+      prev.map((risk, i) =>
+        i === index ? { ...risk, selected: !risk.selected } : risk
+      )
+    );
+  }
+
+  function toggleExpand(index: number) {
+    setExpandedIndex((prev) => (prev === index ? null : index));
+  }
+
+  async function handleSaveAndContinue() {
+    const selected = generatedRisks.filter((risk) => risk.selected);
+
+    if (selected.length === 0) {
+      setMessage("Select at least one generated risk before continuing.");
+      return;
+    }
+
     setSavingRisks(true);
+    setMessage("");
+
     try {
-      const riskRows = selected.map((r, i) => ({
+      const { data: existingRisks, error: existingError } = await supabase
+        .from("project_risks")
+        .select("risk_code")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
+
+      if (existingError) {
+        throw new Error(existingError.message);
+      }
+
+      const nextIndex = (existingRisks?.length || 0) + 1;
+
+      const rows = selected.map((risk, index) => ({
         project_id: projectId,
-        risk_code: `R${String(i + 1).padStart(3, "0")}`,
-        title: r.title,
-        description: r.description,
-        category: r.category,
-        probability: r.probability,
-        impact: r.impact,
-        score: r.score,
-        level: r.level,
+        risk_code: `R${String(nextIndex + index).padStart(3, "0")}`,
+        title: risk.title,
+        description: risk.description,
+        category: risk.category,
+        probability: risk.probability,
+        impact: risk.impact,
+        score: risk.score,
+        level: risk.level,
         status: "open",
+        source_type: risk.source_type,
+        source_template_id: risk.source_template_id ?? null,
+        generation_reason: risk.generation_reason ?? null,
+        review_status: "accepted",
+        suggested_action: risk.suggested_action ?? null,
       }));
 
-      const { error } = await supabase.from("project_risks").insert(riskRows);
-      if (error) throw error;
+      const { error: insertError } = await supabase
+        .from("project_risks")
+        .insert(rows);
 
-      // Also save an action for each high risk
-      const highRisks = selected.filter(r => r.level === "high");
-      if (highRisks.length > 0) {
-        const actionRows = highRisks.map(r => ({
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
+      const highRiskActions = selected
+        .filter((risk) => risk.level === "high" && risk.suggested_action?.trim())
+        .map((risk) => ({
           project_id: projectId,
-          title: r.suggested_action,
-          description: `Aanbevolen maatregel voor: ${r.title}`,
+          title: risk.suggested_action,
+          description: `Recommended mitigation for: ${risk.title}`,
           status: "open",
           priority: "high",
         }));
-        await supabase.from("risk_actions").insert(actionRows);
+
+      if (highRiskActions.length > 0) {
+        const { error: actionError } = await supabase
+          .from("risk_actions")
+          .insert(highRiskActions);
+
+        if (actionError) {
+          throw new Error(actionError.message);
+        }
       }
 
-      setSavedCount(selected.length);
-      setGeneratedRisks(null);
-    } catch (e: any) {
-      setAiError(e?.message || "Opslaan mislukt.");
+      router.push(`/app/projects/${projectId}/intake/step-8`);
+    } catch (error: any) {
+      setMessage(error?.message || "Could not save generated risks.");
     } finally {
       setSavingRisks(false);
     }
   }
 
-  async function handleSaveDraft() {
-    setSaving(true); setMessage("");
-    const error = await saveStep();
-    setMessage(error ? (error.message || "Could not save.") : "Draft saved.");
-    setSaving(false);
-  }
-
-  async function handleNext() {
-    setSaving(true); setMessage("");
-    const error = await saveStep();
-    if (error) { setMessage(error.message || "Could not continue."); setSaving(false); return; }
-    router.push(`/app/projects/${projectId}/intake/step-8`);
-  }
-
-  if (loading) return (
-    <section className="flex-1 bg-slate-50 py-16">
-      <div className="mx-auto max-w-3xl">
-        <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">Loading step 7...</div>
-      </div>
-    </section>
+  const selectedCount = useMemo(
+    () => generatedRisks.filter((risk) => risk.selected).length,
+    [generatedRisks]
   );
+
+  const baselineCount = useMemo(
+    () => generatedRisks.filter((risk) => risk.source_type === "template").length,
+    [generatedRisks]
+  );
+
+  const aiCount = useMemo(
+    () => generatedRisks.filter((risk) => risk.source_type === "ai").length,
+    [generatedRisks]
+  );
+
+  const highCount = useMemo(
+    () => generatedRisks.filter((risk) => risk.level === "high").length,
+    [generatedRisks]
+  );
+
+  if (loading) {
+    return (
+      <section className="flex-1 bg-slate-50 py-16">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
+            Loading step 7...
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="flex-1 bg-slate-50 py-16">
-      <div className="mx-auto w-full max-w-3xl">
-
-        {/* Progress header */}
+      <div className="mx-auto w-full max-w-5xl px-6">
         <div className="mb-10">
           <p className="text-sm font-semibold text-violet-600">Step 7 of 8</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">Initial Risks</h1>
-          <p className="mt-2 text-slate-500">
-            Add the first risk signals for <span className="font-medium text-slate-700">{project?.name}</span>.
+
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
+            Generate Initial Risks
+          </h1>
+
+          <p className="mt-2 max-w-3xl text-slate-500">
+            We combine baseline risk templates with AI-based project-specific
+            suggestions for{" "}
+            <span className="font-medium text-slate-700">{project?.name}</span>.
+            Review the proposed risks, deselect anything irrelevant, and continue.
           </p>
+
           <div className="mt-6 flex items-center gap-6">
             <div className="h-3 flex-1 rounded-full bg-slate-200">
-              <div className="h-3 w-[88%] rounded-full bg-violet-500" />
+              <div className="h-3 w-[87.5%] rounded-full bg-violet-500" />
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">88%</div>
+
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+              87.5%
+            </div>
           </div>
         </div>
 
-        {message && <div className="mb-6 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">{message}</div>}
-
-        {/* Saved confirmation */}
-        {savedCount !== null && (
-          <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 flex-shrink-0">
-              <Check style={{ height: 16, width: 16, color: "white" }} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-emerald-800">{savedCount} risico's opgeslagen in het risicoregister!</p>
-              <p className="text-xs text-emerald-600 mt-0.5">De high-risico's hebben ook automatisch een actie gekregen.</p>
-            </div>
+        {message && (
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
+            {message}
           </div>
         )}
 
-        {/* ── AI GENERATOR CARD ── */}
-        <div className="mb-6 rounded-3xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 p-8 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div style={{ height: 52, width: 52, borderRadius: 16, background: "linear-gradient(135deg, #7c3aed, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Sparkles style={{ height: 26, width: 26, color: "white" }} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                    <Sparkles className="h-4 w-4" />
+                    Risk Intelligence
+                  </div>
+
+                  <h2 className="mt-4 text-2xl font-semibold text-slate-900">
+                    Generate your first risk register
+                  </h2>
+
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                    This step generates baseline risks from your project profile
+                    and adds extra AI suggestions for project-specific context.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateRisks}
+                  disabled={generating || savingStep}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generate risks
+                    </>
+                  )}
+                </button>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Genereer risico's met AI</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Claude analyseert alle projectinfo uit stappen 1–6 en genereert een complete risicolijst. Jij kiest welke je bewaart.
-                </p>
-              </div>
             </div>
-          </div>
 
-          <div className="mt-5 rounded-2xl bg-white/70 border border-violet-100 px-4 py-3">
-            <p className="text-xs font-semibold text-violet-700 uppercase tracking-wide mb-2">Wat de AI gebruikt:</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                project?.name ? `📋 ${project.name}` : null,
-                project?.project_type ? `🏗️ ${project.project_type}` : null,
-                project?.city ? `📍 ${project.city}` : null,
-                project?.project_phase ? `🔄 ${project.project_phase}` : null,
-                project?.client_name ? `👤 ${project.client_name}` : null,
-                project?.project_value ? `💶 €${parseInt(project.project_value).toLocaleString("nl-NL")}` : null,
-                selectedCategories.length > 0 ? `🏷️ ${selectedCategories.length} categorieën` : null,
-                initialRisks ? `✍️ Jouw input` : null,
-              ].filter(Boolean).map((tag, i) => (
-                <span key={i} className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700">{tag}</span>
-              ))}
-            </div>
-          </div>
+            {generatedRisks.length > 0 && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Proposed risks
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Select the risks you want to add to the project register.
+                    </p>
+                  </div>
 
-          {aiError && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center gap-3">
-              <AlertTriangle style={{ height: 16, width: 16, color: "#dc2626", flexShrink: 0 }} />
-              <p className="text-sm text-red-700">{aiError}</p>
-            </div>
-          )}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                    {selectedCount} selected
+                  </div>
+                </div>
 
-          <button
-            onClick={handleGenerateAI}
-            disabled={generating}
-            className="mt-5 flex w-full items-center justify-center gap-3 rounded-2xl py-4 text-[16px] font-bold text-white transition disabled:opacity-70"
-            style={{ background: generating ? "#a78bfa" : "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)", boxShadow: generating ? "none" : "0 4px 20px rgba(124,58,237,0.3)" }}
-          >
-            {generating ? (
-              <><Loader2 style={{ height: 20, width: 20, animation: "spin 1s linear infinite" }} /> Risico's genereren...</>
-            ) : (
-              <><Sparkles style={{ height: 20, width: 20 }} /> Genereer risico's met AI</>
-            )}
-          </button>
-        </div>
+                <div className="space-y-4">
+                  {generatedRisks.map((risk, index) => {
+                    const expanded = expandedIndex === index;
 
-        {/* ── MANUAL INPUT CARD ── */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Handmatige risico input</h2>
-          <p className="mt-1 mb-6 text-sm text-slate-500">
-            Vul zelf ook risico's in. De AI gebruikt dit als extra context.
-          </p>
+                    return (
+                      <div
+                        key={`${risk.title}-${index}`}
+                        className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                      >
+                        <div className="flex flex-col gap-4 p-5">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="flex items-start gap-4">
+                              <button
+                                type="button"
+                                onClick={() => toggleRisk(index)}
+                                className={`mt-1 inline-flex h-6 w-6 items-center justify-center rounded-md border transition ${
+                                  risk.selected
+                                    ? "border-violet-500 bg-violet-600 text-white"
+                                    : "border-slate-300 bg-white text-transparent"
+                                }`}
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
 
-          <div className="mb-6">
-            <label className="mb-2 block text-sm font-medium text-slate-700">Relevante risico categorieën</label>
-            <div className="flex flex-wrap gap-3">
-              {riskCategories.map(cat => {
-                const active = selectedCategories.includes(cat);
-                return (
-                  <button key={cat} type="button" onClick={() => toggleCategory(cat)}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${active ? "border-violet-400 bg-violet-50 text-violet-700" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
-                    {cat}
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-base font-semibold text-slate-900">
+                                    {risk.title}
+                                  </h3>
+
+                                  <span
+                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${sourceClasses(
+                                      risk.source_type
+                                    )}`}
+                                  >
+                                    {risk.source_type === "template"
+                                      ? "Baseline"
+                                      : "AI suggestion"}
+                                  </span>
+
+                                  <span
+                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${levelClasses(
+                                      risk.level
+                                    )}`}
+                                  >
+                                    {risk.level}
+                                  </span>
+                                </div>
+
+                                <p className="mt-2 text-sm text-slate-500">
+                                  {risk.category} • Probability {risk.probability} •
+                                  Impact {risk.impact} • Score {risk.score}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(index)}
+                              className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                            >
+                              {expanded ? (
+                                <>
+                                  Hide details <ChevronUp className="h-4 w-4" />
+                                </>
+                              ) : (
+                                <>
+                                  Show details <ChevronDown className="h-4 w-4" />
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {expanded && (
+                            <div className="rounded-2xl bg-slate-50 p-4">
+                              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Description
+                                  </p>
+                                  <p className="mt-1 text-sm leading-6 text-slate-700">
+                                    {risk.description || "—"}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Suggested action
+                                  </p>
+                                  <p className="mt-1 text-sm leading-6 text-slate-700">
+                                    {risk.suggested_action || "—"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {risk.generation_reason && (
+                                <div className="mt-4">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Why this was included
+                                  </p>
+                                  <p className="mt-1 text-sm leading-6 text-slate-700">
+                                    {risk.generation_reason}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/app/projects/${projectId}/intake/step-6`)}
+                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Back
                   </button>
-                );
-              })}
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAndContinue}
+                    disabled={savingRisks || generating || selectedCount === 0}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingRisks ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        Continue to review
+                        <Check className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Project context
+              </h3>
+
+              <div className="mt-5 space-y-4 text-sm">
+                <div>
+                  <p className="text-slate-400">Project</p>
+                  <p className="mt-1 font-medium text-slate-800">{project?.name || "—"}</p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Type</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {project?.project_type || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Contract</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {project?.contract_type || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Location</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {[project?.city, project?.region, project?.country]
+                      .filter(Boolean)
+                      .join(", ") || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Site type</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {project?.site_type || "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Permit required</p>
+                  <p className="mt-1 font-medium text-slate-800">
+                    {project?.permit_required === null
+                      ? "Unknown"
+                      : project?.permit_required
+                      ? "Yes"
+                      : "No"}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">Initiële risico's</label>
-            <textarea value={initialRisks} onChange={e => setInitialRisks(e.target.value)} rows={7}
-              placeholder={`Bijv:\n- Vertraging vergunningverlening\n- Leverancier levertijden\n- Weersomstandigheden tijdens uitvoering\n- Afhankelijkheid nutsvoorzieningen`}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-violet-400 focus:bg-white" />
-            <p className="mt-2 text-xs text-slate-400">Korte notities of bullets. De AI gebruikt dit als extra input.</p>
-          </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Generation summary
+              </h3>
 
-          <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
-            <button onClick={() => router.push(`/app/projects/${projectId}/intake/step-6`)}
-              className="rounded-xl border border-slate-200 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50">Back</button>
-            <div className="flex gap-3">
-              <button onClick={handleSaveDraft} disabled={saving}
-                className="rounded-xl border border-slate-200 px-5 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                {saving ? "Saving..." : "Save draft"}
-              </button>
-              <button onClick={handleNext} disabled={saving}
-                className="rounded-xl bg-violet-500 px-6 py-2 text-sm font-semibold text-white hover:bg-violet-600 disabled:opacity-60">
-                {saving ? "Saving..." : "Next step"}
-              </button>
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <ShieldAlert className="h-4 w-4" />
+                    Baseline risks
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {baselineCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Brain className="h-4 w-4" />
+                    AI suggestions
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {aiCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <AlertTriangle className="h-4 w-4" />
+                    High risks
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {highCount}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Check className="h-4 w-4" />
+                    Selected
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {selectedCount}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">
+                How this works
+              </h3>
+
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <li>• Baseline risks come from your template library.</li>
+                <li>• AI adds only extra project-specific suggestions.</li>
+                <li>• High risks can automatically create mitigation actions.</li>
+                <li>• You stay in control by selecting what gets saved.</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
-
-      {/* AI Review Modal */}
-      {generatedRisks && (
-        <AIReviewModal
-          risks={generatedRisks}
-          onClose={() => setGeneratedRisks(null)}
-          onConfirm={handleSaveRisks}
-          saving={savingRisks}
-        />
-      )}
     </section>
   );
 }
