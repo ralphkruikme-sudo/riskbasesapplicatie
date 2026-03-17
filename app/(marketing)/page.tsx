@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -119,155 +120,402 @@ function DotList({ items }: { items: string[] }) {
   );
 }
 
-function HeroRibbonObject() {
-  // Three smooth flowing silk ribbons like the Stripe reference — wide sweeping curves, full height
+
+function ParticleField() {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const resize = () => {
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const W = () => canvas.offsetWidth;
+    const H = () => canvas.offsetHeight;
+    const MARGIN = 24;
+
+    type Particle = {
+      x: number; y: number; startY: number; targetY: number; targetX: number;
+      vx: number; vy: number; r: number; hue: number; sat: number;
+      alpha: number; pulse: number; pulseSpeed: number;
+      landDelay: number; landed: boolean;
+      isBubble: boolean;
+      // pop state
+      popTimer: number; popTrigger: number;
+      popPhase: number; // 0=alive 1=swelling 2=popping 3=done
+      popProgress: number;
+    };
+
+    const mkP = (delayOverride?: number): Particle => {
+      const w = W(), h = H();
+      const isBubble = Math.random() < 0.22;
+      const tx = MARGIN + Math.random() * (w - MARGIN * 2);
+      const ty = MARGIN + Math.random() * (h - MARGIN * 2);
+      return {
+        x: tx, y: -60 - Math.random() * h,
+        startY: -60 - Math.random() * h,
+        targetY: ty, targetX: tx,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: isBubble ? 3 + Math.random() * 4 : 0.9 + Math.random() * 1.5,
+        hue: 260 + Math.random() * 70,
+        sat: 65 + Math.random() * 25,
+        alpha: isBubble ? 0.42 + Math.random() * 0.32 : 0.30 + Math.random() * 0.48,
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.007 + Math.random() * 0.013,
+        landDelay: delayOverride ?? Math.random() * 800,
+        landed: false, isBubble,
+        popTimer: 0,
+        popTrigger: 3000 + Math.random() * 9000,
+        popPhase: 0, popProgress: 0,
+      };
+    };
+
+    const particles: Particle[] = Array.from({ length: 1050 }, () => mkP());
+
+    let animId: number;
+    let startTime: number | null = null;
+    let lastTs = 0;
+
+    const draw = (ts: number) => {
+      if (!startTime) startTime = ts;
+      const elapsed = ts - startTime;
+      const dt = Math.min(ts - lastTs, 50);
+      lastTs = ts;
+
+      ctx.clearRect(0, 0, W(), H());
+      const w = W(), h = H();
+
+      for (const p of particles) {
+        const t = Math.max(0, Math.min(1, (elapsed - p.landDelay) / 1500));
+        const ease = 1 - Math.pow(1 - t, 3);
+
+        if (t < 1) {
+          p.y = p.startY + (p.targetY - p.startY) * ease;
+          p.x = p.targetX;
+        } else {
+          if (!p.landed) p.landed = true;
+
+          // bubble pop logic
+          if (p.isBubble && p.popPhase === 0) {
+            p.popTimer += dt;
+            if (p.popTimer > p.popTrigger) p.popPhase = 1;
+          }
+          if (p.popPhase === 1) { // swell
+            p.popProgress = Math.min(1, p.popProgress + dt / 400);
+            if (p.popProgress >= 1) p.popPhase = 2;
+          }
+          if (p.popPhase === 2) { // pop burst
+            p.popProgress = Math.min(1, p.popProgress + dt / 180);
+            if (p.popProgress >= 1) {
+              // respawn as new particle
+              const np = mkP(0);
+              Object.assign(p, np);
+              p.landed = true; p.y = p.targetY; p.x = p.targetX;
+            }
+          }
+
+          // drift (only when not popping)
+          if (p.popPhase < 2) {
+            p.x += p.vx; p.y += p.vy;
+            p.pulse += p.pulseSpeed;
+            if (p.x < MARGIN)     { p.x = MARGIN;     p.vx =  Math.abs(p.vx); }
+            if (p.x > w - MARGIN) { p.x = w - MARGIN; p.vx = -Math.abs(p.vx); }
+            if (p.y < MARGIN)     { p.y = MARGIN;      p.vy =  Math.abs(p.vy); }
+            if (p.y > h - MARGIN) { p.y = h - MARGIN;  p.vy = -Math.abs(p.vy); }
+          }
+        }
+
+        const fadeIn = Math.min(1, t * 2.5);
+        const pulseFactor = p.landed ? (0.80 + 0.20 * Math.sin(p.pulse)) : 1;
+
+        if (p.isBubble) {
+          let drawR = p.r * pulseFactor;
+          let drawA = p.alpha * fadeIn;
+
+          if (p.popPhase === 1) {
+            // swell: grow 1x → 1.5x
+            drawR = p.r * (1 + 0.5 * p.popProgress) * pulseFactor;
+            drawA = p.alpha * fadeIn;
+          } else if (p.popPhase === 2) {
+            // pop: expand ring outward, fade out
+            drawR = p.r * 1.5 * (1 + 0.6 * p.popProgress);
+            drawA = p.alpha * (1 - p.popProgress);
+          }
+
+          if (drawA <= 0) continue;
+
+          // outer ring
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
+          ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, 65%, ${drawA * 1.6})`;
+          ctx.lineWidth = p.popPhase === 2 ? 0.8 : 1.6;
+          ctx.stroke();
+
+          // inner gradient fill
+          const bg = ctx.createRadialGradient(p.x, p.y - drawR * 0.3, drawR * 0.05, p.x, p.y, drawR);
+          bg.addColorStop(0,   `hsla(${p.hue}, ${p.sat}%, 88%, ${drawA * 0.68})`);
+          bg.addColorStop(0.5, `hsla(${p.hue}, ${p.sat}%, 72%, ${drawA * 0.30})`);
+          bg.addColorStop(1,   `hsla(${p.hue}, ${p.sat}%, 65%, 0)`);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
+          ctx.fillStyle = bg;
+          ctx.fill();
+
+          // specular highlight (top-left gleam)
+          if (p.popPhase < 2) {
+            ctx.beginPath();
+            ctx.arc(p.x - drawR * 0.28, p.y - drawR * 0.30, drawR * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${drawA * 0.55})`;
+            ctx.fill();
+          }
+
+          // second burst ring on pop
+          if (p.popPhase === 2) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, drawR * 1.35, 0, Math.PI * 2);
+            ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, 80%, ${drawA * 0.3})`;
+            ctx.lineWidth = 0.4;
+            ctx.stroke();
+          }
+        } else {
+          // dot
+          const a = p.alpha * fadeIn * pulseFactor;
+          const r = p.r * pulseFactor;
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.0);
+          g.addColorStop(0,   `hsla(${p.hue}, ${p.sat}%, 68%, ${a})`);
+          g.addColorStop(0.4, `hsla(${p.hue}, ${p.sat}%, 62%, ${a * 0.38})`);
+          g.addColorStop(1,   `hsla(${p.hue}, ${p.sat}%, 55%, 0)`);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r * 3.0, 0, Math.PI * 2);
+          ctx.fillStyle = g;
+          ctx.fill();
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    animId = requestAnimationFrame(draw);
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      style={{ zIndex: 1 }}
+    />
+  );
+}
+
+
+function HeroRibbon() {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const svgRef = React.useRef<SVGSVGElement>(null);
+  const animRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    // Height: stop just above feature bar
+    const setHeight = () => {
+      if (!wrapRef.current) return;
+      const secs = document.querySelectorAll("section");
+      const bar = secs[1] as HTMLElement | null;
+      if (bar) {
+        const top = bar.getBoundingClientRect().top + window.scrollY;
+        wrapRef.current.style.height = (top - 10) + "px";
+      }
+    };
+    setTimeout(setHeight, 60);
+    window.addEventListener("resize", setHeight);
+    return () => window.removeEventListener("resize", setHeight);
+  }, []);
+
+  React.useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const W = 560, H = 1000, N = 100;
+    let t = 0;
+
+    // Create 3 ribbon groups: each has a fill path + a sheen path
+    const groups: { fill: SVGPathElement; sheen: SVGPathElement }[] = [];
+
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+
+    // Main ribbon gradient
+    const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    grad.setAttribute("id", "rg");
+    grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
+    grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
+    const gStops = [
+      [0,   "rgba(255,255,255,0)"],
+      [0.05,"rgba(90,70,255,0.20)"],
+      [0.14,"rgba(58,40,255,0.99)"],
+      [0.26,"rgba(195,185,255,0.93)"],
+      [0.37,"rgba(50,32,255,1.0)"],
+      [0.49,"rgba(191,181,255,0.95)"],
+      [0.61,"rgba(55,37,255,0.99)"],
+      [0.73,"rgba(188,178,255,0.93)"],
+      [0.85,"rgba(60,42,255,0.97)"],
+      [0.94,"rgba(130,115,255,0.22)"],
+      [1,   "rgba(255,255,255,0)"],
+    ];
+    gStops.forEach(([o, c]) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+      s.setAttribute("offset", (o as number * 100) + "%");
+      s.setAttribute("stop-color", c as string);
+      grad.appendChild(s);
+    });
+    defs.appendChild(grad);
+
+    // Sheen gradient
+    const sg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    sg.setAttribute("id", "sg");
+    sg.setAttribute("x1", "0"); sg.setAttribute("y1", "0");
+    sg.setAttribute("x2", "0"); sg.setAttribute("y2", "1");
+    const sStops = [
+      [0,   "rgba(255,255,255,0)"],
+      [0.10,"rgba(255,255,255,0.94)"],
+      [0.25,"rgba(255,255,255,0.02)"],
+      [0.45,"rgba(255,255,255,0.92)"],
+      [0.61,"rgba(255,255,255,0.02)"],
+      [0.79,"rgba(255,255,255,0.90)"],
+      [1,   "rgba(255,255,255,0)"],
+    ];
+    sStops.forEach(([o, c]) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+      s.setAttribute("offset", (o as number * 100) + "%");
+      s.setAttribute("stop-color", c as string);
+      sg.appendChild(s);
+    });
+    defs.appendChild(sg);
+
+    // Fade mask
+    const maskGrad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    maskGrad.setAttribute("id", "mg");
+    maskGrad.setAttribute("x1","0"); maskGrad.setAttribute("y1","0");
+    maskGrad.setAttribute("x2","0"); maskGrad.setAttribute("y2","1");
+    [[0,"#000"],[0.87,"#000"],[1,"rgba(0,0,0,0)"]].forEach(([o,c])=>{
+      const s = document.createElementNS("http://www.w3.org/2000/svg","stop");
+      s.setAttribute("offset", (parseFloat(o as string)*100)+"%");
+      s.setAttribute("stop-color", c as string);
+      maskGrad.appendChild(s);
+    });
+    defs.appendChild(maskGrad);
+
+    const mask = document.createElementNS("http://www.w3.org/2000/svg","mask");
+    mask.setAttribute("id","fm");
+    const mr = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    mr.setAttribute("width", String(W)); mr.setAttribute("height", String(H));
+    mr.setAttribute("fill","url(#mg)");
+    mask.appendChild(mr);
+    defs.appendChild(mask);
+
+    svg.appendChild(defs);
+
+    // Main group with mask
+    const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute("mask","url(#fm)");
+    svg.appendChild(g);
+
+    // 3 ribbons
+    const configs = [
+      { hw: 82, wave: 0.115, phase: 0,    sheenHw: 17 },
+      { hw: 64, wave: 0.115, phase: 1.1,  sheenHw: 13 },
+      { hw: 48, wave: 0.115, phase: 2.3,  sheenHw: 10 },
+    ];
+
+    configs.forEach(cfg => {
+      const fill = document.createElementNS("http://www.w3.org/2000/svg","path");
+      fill.setAttribute("fill","url(#rg)");
+      g.appendChild(fill);
+      const sheen = document.createElementNS("http://www.w3.org/2000/svg","path");
+      sheen.setAttribute("fill","url(#sg)");
+      sheen.setAttribute("opacity","0.72");
+      g.appendChild(sheen);
+      groups.push({ fill, sheen });
+    });
+
+    const buildPath = (hw: number, wave: number, phase: number, sheenHw: number): [string, string] => {
+      const spine = Array.from({length: N+1}, (_, i) => {
+        const n = i / N;
+        // Strong diagonal: starts at 98% width from left at top, ends at 8% at bottom
+        const diag = W * (0.98 - n * 0.90);
+        const w = Math.sin(n * Math.PI * 2.2 + t * 0.28 + phase) * W * wave;
+        return { x: diag + w, y: n * H };
+      });
+
+      const L: {x:number,y:number}[] = [];
+      const R: {x:number,y:number}[] = [];
+      const SH: {x:number,y:number}[] = [];
+
+      for (let i = 0; i <= N; i++) {
+        const a = spine[Math.max(0,i-1)], b = spine[Math.min(N,i+1)];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len = Math.sqrt(dx*dx+dy*dy)||1;
+        const nx = -dy/len, ny = dx/len;
+        L.push({x: spine[i].x + nx*hw, y: spine[i].y + ny*hw});
+        R.push({x: spine[i].x - nx*hw, y: spine[i].y - ny*hw});
+        SH.push({x: spine[i].x + nx*sheenHw, y: spine[i].y + ny*sheenHw});
+      }
+
+      const pts2path = (arr:{x:number,y:number}[], start='M') =>
+        arr.map((p,i) => `${i===0?start:'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('');
+
+      const fillPath = pts2path(L) + pts2path([...R].reverse(), 'L') + 'Z';
+      const sheenPath = pts2path(L) + pts2path([...SH].reverse(), 'L') + 'Z';
+      return [fillPath, sheenPath];
+    };
+
+    const frame = () => {
+      configs.forEach((cfg, i) => {
+        const [fp, sp] = buildPath(cfg.hw, cfg.wave, cfg.phase, cfg.sheenHw);
+        groups[i].fill.setAttribute('d', fp);
+        groups[i].sheen.setAttribute('d', sp);
+      });
+      t += 0.007;
+      animRef.current = requestAnimationFrame(frame);
+    };
+
+    animRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
+
   return (
     <div
-      className="pointer-events-none absolute inset-0 hidden lg:block"
-      style={{ width: "100%", height: "100%", zIndex: 0 }}
+      ref={wrapRef}
+      className="pointer-events-none absolute right-0 hidden lg:block"
+      style={{ width: 580, height: 1100, zIndex: 5, overflow: "visible", top: 0 }}
     >
-      {/* soft ambient glow */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 70% at 40% 50%, rgba(99,91,255,0.18) 0%, rgba(130,110,255,0.08) 55%, transparent 80%)",
-          filter: "blur(32px)",
-        }}
+      <svg
+        ref={svgRef}
+        viewBox="0 0 560 1000"
+        style={{ width: "100%", height: "100%", overflow: "visible" }}
+        preserveAspectRatio="xMaxYMin meet"
       />
-
-      {/* RIBBON 1 — back, wide, slow */}
-      <motion.div
-        animate={{ rotate: [3, -3, 3], scaleX: [1, 1.04, 1] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
-      >
-        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-          <defs>
-            <linearGradient id="r1g" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
-              <stop offset="10%"  stopColor="rgba(160,140,255,0.20)" />
-              <stop offset="28%"  stopColor="rgba(99,91,255,0.88)" />
-              <stop offset="46%"  stopColor="rgba(220,210,255,0.75)" />
-              <stop offset="62%"  stopColor="rgba(85,75,255,0.92)" />
-              <stop offset="80%"  stopColor="rgba(180,165,255,0.30)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </linearGradient>
-          </defs>
-          {/* wide flowing S-curve ribbon */}
-          <path
-            d="M 60 0 C 20 120, 360 200, 340 380 C 320 560, 60 620, 80 800 C 95 900, 200 940, 220 960 L 280 960 C 260 940, 160 900, 150 800 C 130 620, 390 560, 370 380 C 350 200, 10 120, 50 0 Z"
-            fill="url(#r1g)"
-            style={{ filter: "drop-shadow(0 0 28px rgba(99,91,255,0.30))" }}
-          />
-          {/* sheen highlight on ribbon 1 */}
-          <path
-            d="M 175 0 C 155 120, 250 200, 238 380 C 226 560, 155 620, 165 800 C 170 900, 200 940, 210 960 L 230 960 C 222 940, 194 900, 190 800 C 180 620, 252 560, 264 380 C 276 200, 182 120, 200 0 Z"
-            fill="rgba(255,255,255,0.55)"
-          />
-        </svg>
-      </motion.div>
-
-      {/* RIBBON 2 — middle, offset phase */}
-      <motion.div
-        animate={{ rotate: [-4, 4, -4], scaleX: [0.88, 0.94, 0.88] }}
-        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
-      >
-        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-          <defs>
-            <linearGradient id="r2g" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
-              <stop offset="12%"  stopColor="rgba(140,125,255,0.18)" />
-              <stop offset="30%"  stopColor="rgba(108,98,255,0.82)" />
-              <stop offset="50%"  stopColor="rgba(240,235,255,0.80)" />
-              <stop offset="68%"  stopColor="rgba(95,82,255,0.86)" />
-              <stop offset="85%"  stopColor="rgba(195,182,255,0.25)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 110 0 C 300 80, 80 260, 120 420 C 160 580, 360 640, 320 800 C 300 900, 200 940, 185 960 L 240 960 C 258 940, 355 900, 375 800 C 415 640, 210 580, 170 420 C 130 260, 355 80, 165 0 Z"
-            fill="url(#r2g)"
-            style={{ filter: "drop-shadow(0 0 20px rgba(99,91,255,0.22))" }}
-            opacity={0.9}
-          />
-          <path
-            d="M 200 0 C 260 80, 170 260, 195 420 C 220 580, 280 640, 258 800 C 248 900, 215 940, 210 960 L 228 960 C 234 940, 262 900, 272 800 C 294 640, 234 580, 210 420 C 186 260, 278 80, 218 0 Z"
-            fill="rgba(255,255,255,0.50)"
-          />
-        </svg>
-      </motion.div>
-
-      {/* RIBBON 3 — front, narrower, fastest */}
-      <motion.div
-        animate={{ rotate: [5, -2, 5], scaleX: [0.72, 0.80, 0.72] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 2.5 }}
-        style={{ position: "absolute", inset: 0, transformOrigin: "50% 50%" }}
-      >
-        <svg viewBox="0 0 420 960" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-          <defs>
-            <linearGradient id="r3g" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
-              <stop offset="15%"  stopColor="rgba(170,155,255,0.22)" />
-              <stop offset="32%"  stopColor="rgba(115,105,255,0.78)" />
-              <stop offset="52%"  stopColor="rgba(235,230,255,0.82)" />
-              <stop offset="70%"  stopColor="rgba(102,90,255,0.80)" />
-              <stop offset="87%"  stopColor="rgba(200,190,255,0.22)" />
-              <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 150 0 C 360 100, 50 300, 100 460 C 150 620, 380 660, 340 820 C 320 910, 210 945, 195 960 L 245 960 C 262 945, 368 910, 388 820 C 428 660, 198 620, 148 460 C 98 300, 408 100, 198 0 Z"
-            fill="url(#r3g)"
-            style={{ filter: "drop-shadow(0 0 14px rgba(99,91,255,0.18))" }}
-            opacity={0.82}
-          />
-          <path
-            d="M 210 0 C 290 100, 165 300, 185 460 C 205 620, 295 660, 275 820 C 265 910, 220 945, 215 960 L 230 960 C 236 945, 280 910, 290 820 C 310 660, 220 620, 200 460 C 180 300, 306 100, 226 0 Z"
-            fill="rgba(255,255,255,0.45)"
-          />
-        </svg>
-      </motion.div>
-
-      {/* pixel shimmer dots */}
-      {[...Array(12)].map((_, i) => (
-        <motion.div
-          key={`px${i}`}
-          animate={{ opacity: [0, 0.9, 0], scale: [0.6, 1.3, 0.6] }}
-          transition={{
-            duration: 2.2 + (i % 4) * 0.7,
-            delay: (i * 0.41) % 3.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          style={{
-            position: "absolute",
-            left: `${18 + (i % 5) * 16}%`,
-            top: `${8 + Math.floor(i / 4) * 32 + (i % 3) * 5}%`,
-            width: i % 3 === 0 ? 3 : 2,
-            height: i % 3 === 0 ? 3 : 2,
-            borderRadius: 1,
-            background: `rgba(180,165,255,0.95)`,
-            boxShadow: `0 0 ${5 + (i % 3) * 4}px rgba(99,91,255,0.85)`,
-          }}
-        />
-      ))}
     </div>
   );
 }
 
-export default function HomePage() {
-  return (
-    <main className="bg-[#f6f7fb] text-black">
-      {/* HERO */}
-      <section className="relative overflow-hidden bg-white">
-        <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-[#f5f6fb] lg:block" />
 
-        {/* Ribbon — sits behind content, pinned to right edge of section */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[380px] lg:block" style={{ zIndex: 0 }}>
-          <HeroRibbonObject />
-        </div>
+export default function HomePage() {
+
+  return (
+    <main className="bg-[#f6f7fb] text-black" style={{ position: "relative" }}>
+
+      {/* HERO */}
+      <section className="relative bg-white" style={{overflow:"visible"}}>
+        <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-white lg:block" />
 
         <div className="mx-auto max-w-[1560px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
           <div className="grid items-center gap-16 lg:grid-cols-[0.82fr_1.18fr]">
@@ -324,8 +572,13 @@ export default function HomePage() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, amount: 0.15 }}
-              className="relative min-h-[760px] overflow-visible"
+              className="relative overflow-visible"
+              style={{ minHeight: "760px" }}
             >
+              {/* Particles fill entire right column including top gray area */}
+              <div className="pointer-events-none absolute inset-0" style={{ top: "-100px", bottom: "-80px", left: "-60px", right: "-200px", zIndex: 1 }}>
+                <ParticleField />
+              </div>
               <div className="relative z-10">
                 <div className="ml-auto max-w-[980px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
                   <Image
@@ -338,7 +591,7 @@ export default function HomePage() {
                   />
                 </div>
 
-                <div className="-mt-16 ml-12 max-w-[920px] overflow-hidden rounded-[22px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:ml-20">
+                <div className="-mt-12 ml-12 max-w-[920px] overflow-hidden rounded-[22px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:ml-20">
                   <Image
                     src="/project.png"
                     alt="RiskBases project overview"
@@ -354,6 +607,10 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Ribbon — overlaps hero from the right, z above bg but below feature bar */}
+      <div className="pointer-events-none relative hidden lg:block" style={{ height: 0 }}>
+        <HeroRibbon />
+      </div>
       {/* FEATURE LINE */}
       <section className="bg-[#f6f7fb]">
         <div className="mx-auto max-w-[1440px] px-6 py-10 lg:px-10">

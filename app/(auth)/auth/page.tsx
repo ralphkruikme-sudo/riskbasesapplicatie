@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const supabase = createClient(
@@ -21,6 +21,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const isLogin = mode === "login";
@@ -99,6 +100,31 @@ export default function AuthPage() {
     }
   }
 
+  async function handleForgotPassword() {
+    setMessage("");
+
+    if (!email) {
+      setMessage("Please enter your email address first.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setMessage("Password reset email sent. Check your inbox.");
+    } catch (error: any) {
+      setMessage(error?.message || "Could not send reset email.");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
   async function handleGoogleAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -135,15 +161,47 @@ export default function AuthPage() {
   return (
     <main className="min-h-screen bg-slate-100 p-3 sm:p-4 lg:p-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1240px] items-center justify-center">
-        <div className="relative grid w-full overflow-hidden rounded-[24px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] lg:grid-cols-2 lg:min-h-[620px] xl:min-h-[660px]">
-          <div className="absolute left-0 top-7 z-20 px-7 sm:top-9 sm:px-9" style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <img src="/logo-icon.png" alt="RiskBases" style={{ height:44, width:44, borderRadius:12, objectFit:"contain", flexShrink:0 }}/>
-            <span style={{ fontSize:24, fontWeight:700, color:"#1a1a2e", letterSpacing:"-0.03em", whiteSpace:"nowrap" }}>RiskBases</span>
+        <div className="relative grid w-full overflow-hidden rounded-[24px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] lg:min-h-[620px] lg:grid-cols-2 xl:min-h-[660px]">
+          <div
+            className="absolute left-0 top-7 z-20 px-7 sm:top-9 sm:px-9"
+            style={{ display: "flex", alignItems: "center", gap: 12 }}
+          >
+            <img
+              src="/logo-icon.png"
+              alt="RiskBases"
+              style={{
+                height: 44,
+                width: 44,
+                borderRadius: 12,
+                objectFit: "contain",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                color: "#1a1a2e",
+                letterSpacing: "-0.03em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              RiskBases
+            </span>
           </div>
 
           <section className="flex w-full bg-white">
             <div className="flex w-full flex-col justify-center px-6 pb-6 pt-32 sm:px-8 sm:pb-8 sm:pt-36 lg:px-10 lg:pb-10 lg:pt-32 xl:px-12">
               <div className="w-full max-w-[430px]">
+                <button
+                  type="button"
+                  onClick={() => router.push("/")}
+                  className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <ArrowLeft size={16} />
+                  Back to home
+                </button>
+
                 <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-[36px] xl:text-[40px]">
                   {heading}
                 </h1>
@@ -159,7 +217,11 @@ export default function AuthPage() {
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                     aria-label="Continue with Google"
                   >
-                    <img src="/google.png" alt="Google" className="h-5 w-5 object-contain" />
+                    <img
+                      src="/google.png"
+                      alt="Google"
+                      className="h-5 w-5 object-contain"
+                    />
                   </button>
 
                   <button
@@ -168,7 +230,11 @@ export default function AuthPage() {
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                     aria-label="Continue with Microsoft"
                   >
-                    <img src="/microsoft.png" alt="Microsoft" className="h-5 w-5 object-contain" />
+                    <img
+                      src="/microsoft.png"
+                      alt="Microsoft"
+                      className="h-5 w-5 object-contain"
+                    />
                   </button>
 
                   <button
@@ -177,7 +243,11 @@ export default function AuthPage() {
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
                     aria-label="Continue with Apple"
                   >
-                    <img src="/apple.png" alt="Apple" className="h-5 w-5 object-contain" />
+                    <img
+                      src="/apple.png"
+                      alt="Apple"
+                      className="h-5 w-5 object-contain"
+                    />
                   </button>
                 </div>
 
@@ -225,6 +295,19 @@ export default function AuthPage() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+
+                  {isLogin && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={resetLoading}
+                        className="text-sm font-medium text-violet-600 transition hover:text-violet-700 disabled:opacity-60"
+                      >
+                        {resetLoading ? "Sending..." : "Forgot password?"}
+                      </button>
+                    </div>
+                  )}
 
                   <button
                     type="submit"
