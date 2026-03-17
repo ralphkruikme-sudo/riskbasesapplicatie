@@ -121,256 +121,159 @@ function DotList({ items }: { items: string[] }) {
 }
 
 
-function ParticleField() {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const resize = () => {
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      ctx.scale(dpr, dpr);
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const W = () => canvas.offsetWidth;
-    const H = () => canvas.offsetHeight;
-    const MARGIN = 24;
-
-    type Particle = {
-      x: number; y: number; startY: number; targetY: number; targetX: number;
-      vx: number; vy: number; r: number; hue: number; sat: number;
-      alpha: number; pulse: number; pulseSpeed: number;
-      landDelay: number; landed: boolean;
-      isBubble: boolean;
-      // pop state
-      popTimer: number; popTrigger: number;
-      popPhase: number; // 0=alive 1=swelling 2=popping 3=done
-      popProgress: number;
-    };
-
-    const mkP = (delayOverride?: number): Particle => {
-      const w = W(), h = H();
-      const isBubble = Math.random() < 0.22;
-      const tx = MARGIN + Math.random() * (w - MARGIN * 2);
-      const ty = MARGIN + Math.random() * (h - MARGIN * 2);
-      return {
-        x: tx, y: -60 - Math.random() * h,
-        startY: -60 - Math.random() * h,
-        targetY: ty, targetX: tx,
-        vx: (Math.random() - 0.5) * 0.35,
-        vy: (Math.random() - 0.5) * 0.35,
-        r: isBubble ? 3 + Math.random() * 4 : 0.9 + Math.random() * 1.5,
-        hue: 260 + Math.random() * 70,
-        sat: 65 + Math.random() * 25,
-        alpha: isBubble ? 0.42 + Math.random() * 0.32 : 0.30 + Math.random() * 0.48,
-        pulse: Math.random() * Math.PI * 2,
-        pulseSpeed: 0.007 + Math.random() * 0.013,
-        landDelay: delayOverride ?? Math.random() * 800,
-        landed: false, isBubble,
-        popTimer: 0,
-        popTrigger: 3000 + Math.random() * 9000,
-        popPhase: 0, popProgress: 0,
-      };
-    };
-
-    const particles: Particle[] = Array.from({ length: 1050 }, () => mkP());
-
-    let animId: number;
-    let startTime: number | null = null;
-    let lastTs = 0;
-
-    const draw = (ts: number) => {
-      if (!startTime) startTime = ts;
-      const elapsed = ts - startTime;
-      const dt = Math.min(ts - lastTs, 50);
-      lastTs = ts;
-
-      ctx.clearRect(0, 0, W(), H());
-      const w = W(), h = H();
-
-      for (const p of particles) {
-        const t = Math.max(0, Math.min(1, (elapsed - p.landDelay) / 1500));
-        const ease = 1 - Math.pow(1 - t, 3);
-
-        if (t < 1) {
-          p.y = p.startY + (p.targetY - p.startY) * ease;
-          p.x = p.targetX;
-        } else {
-          if (!p.landed) p.landed = true;
-
-          // bubble pop logic
-          if (p.isBubble && p.popPhase === 0) {
-            p.popTimer += dt;
-            if (p.popTimer > p.popTrigger) p.popPhase = 1;
-          }
-          if (p.popPhase === 1) { // swell
-            p.popProgress = Math.min(1, p.popProgress + dt / 400);
-            if (p.popProgress >= 1) p.popPhase = 2;
-          }
-          if (p.popPhase === 2) { // pop burst
-            p.popProgress = Math.min(1, p.popProgress + dt / 180);
-            if (p.popProgress >= 1) {
-              // respawn as new particle
-              const np = mkP(0);
-              Object.assign(p, np);
-              p.landed = true; p.y = p.targetY; p.x = p.targetX;
-            }
-          }
-
-          // drift (only when not popping)
-          if (p.popPhase < 2) {
-            p.x += p.vx; p.y += p.vy;
-            p.pulse += p.pulseSpeed;
-            if (p.x < MARGIN)     { p.x = MARGIN;     p.vx =  Math.abs(p.vx); }
-            if (p.x > w - MARGIN) { p.x = w - MARGIN; p.vx = -Math.abs(p.vx); }
-            if (p.y < MARGIN)     { p.y = MARGIN;      p.vy =  Math.abs(p.vy); }
-            if (p.y > h - MARGIN) { p.y = h - MARGIN;  p.vy = -Math.abs(p.vy); }
-          }
-        }
-
-        const fadeIn = Math.min(1, t * 2.5);
-        const pulseFactor = p.landed ? (0.80 + 0.20 * Math.sin(p.pulse)) : 1;
-
-        if (p.isBubble) {
-          let drawR = p.r * pulseFactor;
-          let drawA = p.alpha * fadeIn;
-
-          if (p.popPhase === 1) {
-            // swell: grow 1x → 1.5x
-            drawR = p.r * (1 + 0.5 * p.popProgress) * pulseFactor;
-            drawA = p.alpha * fadeIn;
-          } else if (p.popPhase === 2) {
-            // pop: expand ring outward, fade out
-            drawR = p.r * 1.5 * (1 + 0.6 * p.popProgress);
-            drawA = p.alpha * (1 - p.popProgress);
-          }
-
-          if (drawA <= 0) continue;
-
-          // outer ring
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
-          ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, 65%, ${drawA * 1.6})`;
-          ctx.lineWidth = p.popPhase === 2 ? 0.8 : 1.6;
-          ctx.stroke();
-
-          // inner gradient fill
-          const bg = ctx.createRadialGradient(p.x, p.y - drawR * 0.3, drawR * 0.05, p.x, p.y, drawR);
-          bg.addColorStop(0,   `hsla(${p.hue}, ${p.sat}%, 88%, ${drawA * 0.68})`);
-          bg.addColorStop(0.5, `hsla(${p.hue}, ${p.sat}%, 72%, ${drawA * 0.30})`);
-          bg.addColorStop(1,   `hsla(${p.hue}, ${p.sat}%, 65%, 0)`);
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, drawR, 0, Math.PI * 2);
-          ctx.fillStyle = bg;
-          ctx.fill();
-
-          // specular highlight (top-left gleam)
-          if (p.popPhase < 2) {
-            ctx.beginPath();
-            ctx.arc(p.x - drawR * 0.28, p.y - drawR * 0.30, drawR * 0.22, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255,255,255,${drawA * 0.55})`;
-            ctx.fill();
-          }
-
-          // second burst ring on pop
-          if (p.popPhase === 2) {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, drawR * 1.35, 0, Math.PI * 2);
-            ctx.strokeStyle = `hsla(${p.hue}, ${p.sat}%, 80%, ${drawA * 0.3})`;
-            ctx.lineWidth = 0.4;
-            ctx.stroke();
-          }
-        } else {
-          // dot
-          const a = p.alpha * fadeIn * pulseFactor;
-          const r = p.r * pulseFactor;
-          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.0);
-          g.addColorStop(0,   `hsla(${p.hue}, ${p.sat}%, 68%, ${a})`);
-          g.addColorStop(0.4, `hsla(${p.hue}, ${p.sat}%, 62%, ${a * 0.38})`);
-          g.addColorStop(1,   `hsla(${p.hue}, ${p.sat}%, 55%, 0)`);
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, r * 3.0, 0, Math.PI * 2);
-          ctx.fillStyle = g;
-          ctx.fill();
-        }
-      }
-
-      animId = requestAnimationFrame(draw);
-    };
-
-    animId = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
-  }, []);
-
+function BrainCard() {
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none absolute inset-0 h-full w-full"
-      style={{ zIndex: 1 }}
-    />
+    <div style={{ position: "relative", width: "100%", aspectRatio: "1179/610", background: "#f6f7fb", borderRadius: 0 }}>
+      <style>{`
+        @keyframes brainPulse {
+          0%,100% { transform: scale(1);     opacity: 0.82; }
+          12%     { transform: scale(1.07);  opacity: 1;    }
+          22%     { transform: scale(0.974); opacity: 0.88; }
+          34%     { transform: scale(1.038); opacity: 0.95; }
+          50%     { transform: scale(1);     opacity: 0.82; }
+        }
+        @keyframes pulseRing {
+          0%   { transform: scale(0.85); opacity: 0.8; }
+          100% { transform: scale(1.6);  opacity: 0;   }
+        }
+        @keyframes rayFlow {
+          0%   { stroke-dashoffset: 180; opacity: 0;   }
+          15%  { opacity: 0.85; }
+          85%  { opacity: 0.85; }
+          100% { stroke-dashoffset: -180; opacity: 0;  }
+        }
+        @keyframes rayFlash {
+          0%,100% { opacity: 0.35; }
+          12%     { opacity: 1.0;  }
+          22%     { opacity: 0.45; }
+          34%     { opacity: 0.85; }
+          50%     { opacity: 0.35; }
+        }
+      `}</style>
+
+      {/* PNG — multiply blends its white bg away */}
+      <img
+        src="/integraties_cropped.png"
+        alt="RiskBases AI Engine"
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1 }}
+      />
+
+      {/* SVG overlay */}
+      <svg viewBox="0 0 1179 610"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", overflow: "visible" }}>
+        <defs>
+          <radialGradient id="bc1" cx="50%" cy="48%" r="52%">
+            <stop offset="0%"   stopColor="#b8a4ff" stopOpacity="0.9"/>
+            <stop offset="40%"  stopColor="#7c5cfc" stopOpacity="0.55"/>
+            <stop offset="100%" stopColor="#5b3de8" stopOpacity="0"/>
+          </radialGradient>
+          <radialGradient id="bc2" cx="42%" cy="38%" r="45%">
+            <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.65"/>
+            <stop offset="60%"  stopColor="#d4c8ff" stopOpacity="0.18"/>
+            <stop offset="100%" stopColor="#9b8aff" stopOpacity="0"/>
+          </radialGradient>
+          {/* Ray gradient: bright near brain, fades to icon */}
+          <linearGradient id="rl" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stopColor="#a78bff" stopOpacity="0"/>
+            <stop offset="30%"  stopColor="#c4b5ff" stopOpacity="0.95"/>
+            <stop offset="70%"  stopColor="#a78bff" stopOpacity="0.7"/>
+            <stop offset="100%" stopColor="#7c5cfc" stopOpacity="0.15"/>
+          </linearGradient>
+          <linearGradient id="rr" x1="100%" y1="0%" x2="0%" y2="0%">
+            <stop offset="0%"   stopColor="#a78bff" stopOpacity="0"/>
+            <stop offset="30%"  stopColor="#c4b5ff" stopOpacity="0.95"/>
+            <stop offset="70%"  stopColor="#a78bff" stopOpacity="0.7"/>
+            <stop offset="100%" stopColor="#7c5cfc" stopOpacity="0.15"/>
+          </linearGradient>
+        </defs>
+
+        {/* Pulse rings from brain center (615, 390) */}
+        {[0, 0.55, 1.10].map((d, i) => (
+          <circle key={i} cx="590" cy="320" r="92" fill="none"
+            stroke="#b8a4ff" strokeWidth="1.4"
+            style={{ transformOrigin:"590px 320px", animation:`pulseRing 2.0s ease-out ${d}s infinite`, opacity:0 }}
+          />
+        ))}
+
+        {/* LEFT rays: brain → icons (Project data, Cost data, Schedule, Weather, Supply chain) */}
+        {/* Each ray: x1=brain edge (~520), y1=brain, x2=icon, y2=icon */}
+        {[
+          { x1:500, y1:220, x2:220, y2:100, delay:"0.0s" },  // Project data
+          { x1:494, y1:270, x2:198, y2:188, delay:"0.25s" }, // Cost data
+          { x1:490, y1:318, x2:194, y2:275, delay:"0.5s" },  // Schedule
+          { x1:494, y1:365, x2:198, y2:368, delay:"0.75s" }, // Weather
+          { x1:500, y1:406, x2:220, y2:455, delay:"1.0s" },  // Supply chain
+        ].map((r, i) => (
+          <line key={i} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2}
+            stroke="url(#rl)" strokeWidth="1.4"
+            strokeDasharray="160 280"
+            style={{ animation:`rayFlow 2.0s linear ${r.delay} infinite`, opacity:0 }}
+          />
+        ))}
+
+        {/* RIGHT rays: brain → icons (Risk score, AI insights, Monte Carlo, Scenario, Alerts) */}
+        {[
+          { x1:685, y1:220, x2:958, y2:100, delay:"0.12s" },  // Risk score
+          { x1:688, y1:270, x2:978, y2:188, delay:"0.37s" }, // AI insights
+          { x1:692, y1:318, x2:982, y2:275, delay:"0.62s" }, // Monte Carlo
+          { x1:688, y1:365, x2:978, y2:368, delay:"0.87s" }, // Scenario
+          { x1:682, y1:406, x2:960, y2:455, delay:"1.12s" },  // Alerts
+        ].map((r, i) => (
+          <line key={i} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2}
+            stroke="url(#rr)" strokeWidth="1.4"
+            strokeDasharray="160 280"
+            style={{ animation:`rayFlow 2.0s linear ${r.delay} infinite`, opacity:0 }}
+          />
+        ))}
+
+        {/* Brain glow — pulses with heartbeat */}
+        <ellipse cx="590" cy="320" rx="148" ry="160"
+          fill="url(#bc1)"
+          style={{ transformOrigin:"590px 320px", animation:"brainPulse 2.0s ease-in-out infinite" }}
+        />
+        <ellipse cx="585" cy="302" rx="88" ry="100"
+          fill="url(#bc2)"
+          style={{ transformOrigin:"585px 302px", animation:"brainPulse 2.0s ease-in-out infinite" }}
+        />
+      </svg>
+    </div>
   );
 }
 
 
 function HeroRibbon() {
-  const wrapRef = React.useRef<HTMLDivElement>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
   const animRef = React.useRef<number>(0);
-
-  React.useEffect(() => {
-    // Height: stop just above feature bar
-    const setHeight = () => {
-      if (!wrapRef.current) return;
-      const secs = document.querySelectorAll("section");
-      const bar = secs[1] as HTMLElement | null;
-      if (bar) {
-        const top = bar.getBoundingClientRect().top + window.scrollY;
-        wrapRef.current.style.height = (top - 10) + "px";
-      }
-    };
-    setTimeout(setHeight, 60);
-    window.addEventListener("resize", setHeight);
-    return () => window.removeEventListener("resize", setHeight);
-  }, []);
 
   React.useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
-    const W = 560, H = 1000, N = 100;
+    // W=320 is the container width, H=900 covers hero + some below
+    const W = 320, H = 900, N = 120;
     let t = 0;
 
-    // Create 3 ribbon groups: each has a fill path + a sheen path
     const groups: { fill: SVGPathElement; sheen: SVGPathElement }[] = [];
-
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
 
-    // Main ribbon gradient
+    // Main ribbon gradient - deep purple to lavender
     const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    grad.setAttribute("id", "rg");
+    grad.setAttribute("id", "rg2");
     grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
     grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
-    const gStops = [
-      [0,   "rgba(255,255,255,0)"],
-      [0.05,"rgba(90,70,255,0.20)"],
-      [0.14,"rgba(58,40,255,0.99)"],
-      [0.26,"rgba(195,185,255,0.93)"],
-      [0.37,"rgba(50,32,255,1.0)"],
-      [0.49,"rgba(191,181,255,0.95)"],
-      [0.61,"rgba(55,37,255,0.99)"],
-      [0.73,"rgba(188,178,255,0.93)"],
-      [0.85,"rgba(60,42,255,0.97)"],
-      [0.94,"rgba(130,115,255,0.22)"],
-      [1,   "rgba(255,255,255,0)"],
-    ];
-    gStops.forEach(([o, c]) => {
+    [
+      [0,    "rgba(255,255,255,0)"],
+      [0.04, "rgba(90,70,255,0.18)"],
+      [0.12, "rgba(58,40,255,1.0)"],
+      [0.24, "rgba(195,185,255,0.95)"],
+      [0.36, "rgba(50,32,255,1.0)"],
+      [0.48, "rgba(191,181,255,0.96)"],
+      [0.60, "rgba(55,37,255,1.0)"],
+      [0.72, "rgba(188,178,255,0.95)"],
+      [0.84, "rgba(60,42,255,0.98)"],
+      [0.93, "rgba(130,115,255,0.20)"],
+      [1,    "rgba(255,255,255,0)"],
+    ].forEach(([o, c]) => {
       const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
       s.setAttribute("offset", (o as number * 100) + "%");
       s.setAttribute("stop-color", c as string);
@@ -378,21 +281,20 @@ function HeroRibbon() {
     });
     defs.appendChild(grad);
 
-    // Sheen gradient
+    // Sheen
     const sg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    sg.setAttribute("id", "sg");
+    sg.setAttribute("id", "sg2");
     sg.setAttribute("x1", "0"); sg.setAttribute("y1", "0");
     sg.setAttribute("x2", "0"); sg.setAttribute("y2", "1");
-    const sStops = [
-      [0,   "rgba(255,255,255,0)"],
-      [0.10,"rgba(255,255,255,0.94)"],
-      [0.25,"rgba(255,255,255,0.02)"],
-      [0.45,"rgba(255,255,255,0.92)"],
-      [0.61,"rgba(255,255,255,0.02)"],
-      [0.79,"rgba(255,255,255,0.90)"],
-      [1,   "rgba(255,255,255,0)"],
-    ];
-    sStops.forEach(([o, c]) => {
+    [
+      [0,    "rgba(255,255,255,0)"],
+      [0.10, "rgba(255,255,255,0.92)"],
+      [0.25, "rgba(255,255,255,0.02)"],
+      [0.44, "rgba(255,255,255,0.90)"],
+      [0.60, "rgba(255,255,255,0.02)"],
+      [0.78, "rgba(255,255,255,0.88)"],
+      [1,    "rgba(255,255,255,0)"],
+    ].forEach(([o, c]) => {
       const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
       s.setAttribute("offset", (o as number * 100) + "%");
       s.setAttribute("stop-color", c as string);
@@ -400,48 +302,46 @@ function HeroRibbon() {
     });
     defs.appendChild(sg);
 
-    // Fade mask
-    const maskGrad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    maskGrad.setAttribute("id", "mg");
-    maskGrad.setAttribute("x1","0"); maskGrad.setAttribute("y1","0");
-    maskGrad.setAttribute("x2","0"); maskGrad.setAttribute("y2","1");
-    [[0,"#000"],[0.87,"#000"],[1,"rgba(0,0,0,0)"]].forEach(([o,c])=>{
+    // Fade mask: fade in at top, fade out at bottom
+    const mg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    mg.setAttribute("id", "mg2");
+    mg.setAttribute("x1","0"); mg.setAttribute("y1","0");
+    mg.setAttribute("x2","0"); mg.setAttribute("y2","1");
+    [[0,"rgba(0,0,0,0)"],[0.05,"#000"],[0.88,"#000"],[1,"rgba(0,0,0,0)"]].forEach(([o,c])=>{
       const s = document.createElementNS("http://www.w3.org/2000/svg","stop");
       s.setAttribute("offset", (parseFloat(o as string)*100)+"%");
       s.setAttribute("stop-color", c as string);
-      maskGrad.appendChild(s);
+      mg.appendChild(s);
     });
-    defs.appendChild(maskGrad);
+    defs.appendChild(mg);
 
     const mask = document.createElementNS("http://www.w3.org/2000/svg","mask");
-    mask.setAttribute("id","fm");
+    mask.setAttribute("id","fm2");
     const mr = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    mr.setAttribute("width", String(W)); mr.setAttribute("height", String(H));
-    mr.setAttribute("fill","url(#mg)");
+    mr.setAttribute("x","-200"); mr.setAttribute("width", "600"); mr.setAttribute("height", String(H));
+    mr.setAttribute("fill","url(#mg2)");
     mask.appendChild(mr);
     defs.appendChild(mask);
-
     svg.appendChild(defs);
 
-    // Main group with mask
     const g = document.createElementNS("http://www.w3.org/2000/svg","g");
-    g.setAttribute("mask","url(#fm)");
+    g.setAttribute("mask","url(#fm2)");
     svg.appendChild(g);
 
-    // 3 ribbons
+    // 3 ribbons — narrower halfwidths: 52, 38, 28
     const configs = [
-      { hw: 82, wave: 0.115, phase: 0,    sheenHw: 17 },
-      { hw: 64, wave: 0.115, phase: 1.1,  sheenHw: 13 },
-      { hw: 48, wave: 0.115, phase: 2.3,  sheenHw: 10 },
+      { hw: 52, wave: 0.10, phase: 0,   sheenHw: 11 },
+      { hw: 38, wave: 0.10, phase: 1.1, sheenHw: 8  },
+      { hw: 28, wave: 0.10, phase: 2.3, sheenHw: 6  },
     ];
 
-    configs.forEach(cfg => {
+    configs.forEach(() => {
       const fill = document.createElementNS("http://www.w3.org/2000/svg","path");
-      fill.setAttribute("fill","url(#rg)");
+      fill.setAttribute("fill","url(#rg2)");
       g.appendChild(fill);
       const sheen = document.createElementNS("http://www.w3.org/2000/svg","path");
-      sheen.setAttribute("fill","url(#sg)");
-      sheen.setAttribute("opacity","0.72");
+      sheen.setAttribute("fill","url(#sg2)");
+      sheen.setAttribute("opacity","0.75");
       g.appendChild(sheen);
       groups.push({ fill, sheen });
     });
@@ -449,9 +349,9 @@ function HeroRibbon() {
     const buildPath = (hw: number, wave: number, phase: number, sheenHw: number): [string, string] => {
       const spine = Array.from({length: N+1}, (_, i) => {
         const n = i / N;
-        // Strong diagonal: starts at 98% width from left at top, ends at 8% at bottom
-        const diag = W * (0.98 - n * 0.90);
-        const w = Math.sin(n * Math.PI * 2.2 + t * 0.28 + phase) * W * wave;
+        // Diagonal: start right of center at top (x≈260), drift left to x≈40 at bottom
+        const diag = W * (0.82 - n * 0.75);
+        const w = Math.sin(n * Math.PI * 2.4 + t * 0.25 + phase) * W * wave;
         return { x: diag + w, y: n * H };
       });
 
@@ -461,20 +361,21 @@ function HeroRibbon() {
 
       for (let i = 0; i <= N; i++) {
         const a = spine[Math.max(0,i-1)], b = spine[Math.min(N,i+1)];
-        const dx = b.x - a.x, dy = b.y - a.y;
+        const dx = b.x-a.x, dy = b.y-a.y;
         const len = Math.sqrt(dx*dx+dy*dy)||1;
         const nx = -dy/len, ny = dx/len;
-        L.push({x: spine[i].x + nx*hw, y: spine[i].y + ny*hw});
-        R.push({x: spine[i].x - nx*hw, y: spine[i].y - ny*hw});
+        L.push({x: spine[i].x + nx*hw,      y: spine[i].y + ny*hw});
+        R.push({x: spine[i].x - nx*hw,      y: spine[i].y - ny*hw});
         SH.push({x: spine[i].x + nx*sheenHw, y: spine[i].y + ny*sheenHw});
       }
 
       const pts2path = (arr:{x:number,y:number}[], start='M') =>
         arr.map((p,i) => `${i===0?start:'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('');
 
-      const fillPath = pts2path(L) + pts2path([...R].reverse(), 'L') + 'Z';
-      const sheenPath = pts2path(L) + pts2path([...SH].reverse(), 'L') + 'Z';
-      return [fillPath, sheenPath];
+      return [
+        pts2path(L) + pts2path([...R].reverse(), 'L') + 'Z',
+        pts2path(L) + pts2path([...SH].reverse(), 'L') + 'Z',
+      ];
     };
 
     const frame = () => {
@@ -486,24 +387,17 @@ function HeroRibbon() {
       t += 0.007;
       animRef.current = requestAnimationFrame(frame);
     };
-
     animRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
   return (
-    <div
-      ref={wrapRef}
-      className="pointer-events-none absolute right-0 hidden lg:block"
-      style={{ width: 580, height: 1100, zIndex: 5, overflow: "visible", top: 0 }}
-    >
-      <svg
-        ref={svgRef}
-        viewBox="0 0 560 1000"
-        style={{ width: "100%", height: "100%", overflow: "visible" }}
-        preserveAspectRatio="xMaxYMin meet"
-      />
-    </div>
+    <svg
+      ref={svgRef}
+      viewBox="0 0 320 900"
+      style={{ width: "100%", height: "100%", overflow: "visible" }}
+      preserveAspectRatio="xMaxYMin meet"
+    />
   );
 }
 
@@ -511,11 +405,11 @@ function HeroRibbon() {
 export default function HomePage() {
 
   return (
+    <>
     <main className="bg-[#f6f7fb] text-black" style={{ position: "relative" }}>
 
       {/* HERO */}
-      <section className="relative bg-white" style={{overflow:"visible"}}>
-        <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-white lg:block" />
+      <section className="bg-white" style={{overflow:"visible"}}>
 
         <div className="mx-auto max-w-[1560px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
           <div className="grid items-center gap-16 lg:grid-cols-[0.82fr_1.18fr]">
@@ -575,10 +469,7 @@ export default function HomePage() {
               className="relative overflow-visible"
               style={{ minHeight: "760px" }}
             >
-              {/* Particles fill entire right column including top gray area */}
-              <div className="pointer-events-none absolute inset-0" style={{ top: "-100px", bottom: "-80px", left: "-60px", right: "-200px", zIndex: 1 }}>
-                <ParticleField />
-              </div>
+
               <div className="relative z-10">
                 <div className="ml-auto max-w-[980px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
                   <Image
@@ -607,10 +498,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Ribbon — overlaps hero from the right, z above bg but below feature bar */}
-      <div className="pointer-events-none relative hidden lg:block" style={{ height: 0 }}>
-        <HeroRibbon />
-      </div>
       {/* FEATURE LINE */}
       <section className="bg-[#f6f7fb]">
         <div className="mx-auto max-w-[1440px] px-6 py-10 lg:px-10">
@@ -691,14 +578,8 @@ export default function HomePage() {
 
               <DotList items={solutionItems} />
 
-              <div className="mt-12 overflow-hidden rounded-[22px] shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
-                <Image
-                  src="/integraties.png"
-                  alt="RiskBases integrations overview"
-                  width={1600}
-                  height={1000}
-                  className="h-auto w-full object-cover"
-                />
+              <div className="mt-12 -mx-6 lg:-mx-0">
+                <BrainCard />
               </div>
             </motion.div>
           </div>
@@ -880,5 +761,9 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+    <div className="pointer-events-none fixed right-0 top-0 hidden lg:block" style={{ zIndex: 9999, width: 320, height: "100vh" }}>
+      <HeroRibbon />
+    </div>
+    </>
   );
 }

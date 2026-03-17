@@ -34,10 +34,10 @@ const navItems: NavItemType[] = [
     label: "Solutions",
     href: "/solutions",
     dropdown: [
-      { label: "Construction", href: "/solutions/construction" },
-      { label: "Infrastructure", href: "/solutions/infrastructure" },
-      { label: "Maritime & Offshore", href: "/solutions/maritime" },
-      { label: "Enterprise Teams", href: "/solutions/enterprise" },
+      { label: "Construction", href: "/solutions#construction" },
+      { label: "Infrastructure", href: "/solutions#infrastructure" },
+      { label: "Maritime & Offshore", href: "/solutions#maritime" },
+      { label: "Enterprise Teams", href: "/solutions#enterprise" },
     ],
   },
   {
@@ -130,9 +130,7 @@ function DesktopNavItem({
 
   const startCloseTimer = () => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-    closeTimeoutRef.current = setTimeout(() => {
-      setOpen(false);
-    }, 120);
+    closeTimeoutRef.current = setTimeout(() => setOpen(false), 120);
   };
 
   const openMenu = () => {
@@ -305,7 +303,10 @@ export default function MarketingHeader() {
                 }
 
                 return (
-                  <div key={item.label} className="border-b border-slate-100 last:border-b-0">
+                  <div
+                    key={item.label}
+                    className="border-b border-slate-100 last:border-b-0"
+                  >
                     <button
                       type="button"
                       onClick={() =>

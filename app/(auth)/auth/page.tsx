@@ -11,6 +11,7 @@ const supabase = createClient(
 );
 
 type Mode = "login" | "signup";
+type MessageType = "success" | "error" | "info";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -20,9 +21,12 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<MessageType | null>(null);
 
   const isLogin = mode === "login";
 
@@ -33,6 +37,21 @@ export default function AuthPage() {
   const subheading = useMemo(() => {
     return isLogin ? "Log in to RiskBases" : "Sign up to RiskBases";
   }, [isLogin]);
+
+  function clearMessage() {
+    setMessage("");
+    setMessageType(null);
+  }
+
+  function showError(text: string) {
+    setMessage(text);
+    setMessageType("error");
+  }
+
+  function showSuccess(text: string) {
+    setMessage(text);
+    setMessageType("success");
+  }
 
   async function redirectAfterAuth() {
     const {
@@ -65,8 +84,8 @@ export default function AuthPage() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    clearMessage();
     setLoading(true);
-    setMessage("");
 
     try {
       if (isLogin) {
@@ -91,20 +110,21 @@ export default function AuthPage() {
 
         if (error) throw error;
 
+        showSuccess("Account created successfully. Redirecting...");
         await redirectAfterAuth();
       }
     } catch (error: any) {
-      setMessage(error?.message || "Something went wrong.");
+      showError(error?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleForgotPassword() {
-    setMessage("");
+    clearMessage();
 
-    if (!email) {
-      setMessage("Please enter your email address first.");
+    if (!email.trim()) {
+      showError("Please enter your email address first.");
       return;
     }
 
@@ -117,15 +137,19 @@ export default function AuthPage() {
 
       if (error) throw error;
 
-      setMessage("Password reset email sent. Check your inbox.");
+      showSuccess(
+        "Password reset email sent. Please check your inbox and click the link in the email."
+      );
     } catch (error: any) {
-      setMessage(error?.message || "Could not send reset email.");
+      showError(error?.message || "Could not send reset email.");
     } finally {
       setResetLoading(false);
     }
   }
 
   async function handleGoogleAuth() {
+    clearMessage();
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -133,10 +157,12 @@ export default function AuthPage() {
       },
     });
 
-    if (error) setMessage(error.message);
+    if (error) showError(error.message);
   }
 
   async function handleMicrosoftAuth() {
+    clearMessage();
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "azure",
       options: {
@@ -144,10 +170,12 @@ export default function AuthPage() {
       },
     });
 
-    if (error) setMessage(error.message);
+    if (error) showError(error.message);
   }
 
   async function handleAppleAuth() {
+    clearMessage();
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
@@ -155,37 +183,27 @@ export default function AuthPage() {
       },
     });
 
-    if (error) setMessage(error.message);
+    if (error) showError(error.message);
   }
+
+  const messageStyles =
+    messageType === "error"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : messageType === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-slate-200 bg-slate-50 text-slate-700";
 
   return (
     <main className="min-h-screen bg-slate-100 p-3 sm:p-4 lg:p-5">
       <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-[1240px] items-center justify-center">
         <div className="relative grid w-full overflow-hidden rounded-[24px] bg-white shadow-[0_18px_60px_rgba(15,23,42,0.10)] lg:min-h-[620px] lg:grid-cols-2 xl:min-h-[660px]">
-          <div
-            className="absolute left-0 top-7 z-20 px-7 sm:top-9 sm:px-9"
-            style={{ display: "flex", alignItems: "center", gap: 12 }}
-          >
+          <div className="absolute left-0 top-7 z-20 flex items-center gap-3 px-7 sm:top-9 sm:px-9">
             <img
               src="/logo-icon.png"
               alt="RiskBases"
-              style={{
-                height: 44,
-                width: 44,
-                borderRadius: 12,
-                objectFit: "contain",
-                flexShrink: 0,
-              }}
+              className="h-11 w-11 rounded-xl object-contain"
             />
-            <span
-              style={{
-                fontSize: 24,
-                fontWeight: 700,
-                color: "#1a1a2e",
-                letterSpacing: "-0.03em",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span className="whitespace-nowrap text-2xl font-bold tracking-[-0.03em] text-[#1a1a2e]">
               RiskBases
             </span>
           </div>
@@ -196,7 +214,7 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => router.push("/")}
-                  className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-800"
                 >
                   <ArrowLeft size={16} />
                   Back to home
@@ -302,7 +320,7 @@ export default function AuthPage() {
                         type="button"
                         onClick={handleForgotPassword}
                         disabled={resetLoading}
-                        className="text-sm font-medium text-violet-600 transition hover:text-violet-700 disabled:opacity-60"
+                        className="text-sm font-medium text-violet-600 transition hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {resetLoading ? "Sending..." : "Forgot password?"}
                       </button>
@@ -312,13 +330,17 @@ export default function AuthPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="h-12 w-full rounded-full bg-gradient-to-r from-violet-600 to-violet-500 text-[16px] font-semibold text-white transition hover:opacity-95 disabled:opacity-60"
+                    className="h-12 w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 text-[16px] font-semibold text-white shadow-[0_10px_30px_rgba(168,85,247,0.28)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? "Please wait..." : isLogin ? "Log in" : "Sign up"}
                   </button>
 
                   {message ? (
-                    <p className="text-sm text-slate-500">{message}</p>
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-sm ${messageStyles}`}
+                    >
+                      {message}
+                    </div>
                   ) : null}
                 </form>
 
@@ -328,9 +350,9 @@ export default function AuthPage() {
                     type="button"
                     onClick={() => {
                       setMode(isLogin ? "signup" : "login");
-                      setMessage("");
+                      clearMessage();
                     }}
-                    className="font-semibold text-violet-600 hover:text-violet-700"
+                    className="font-semibold text-violet-600 transition hover:text-violet-700"
                   >
                     {isLogin ? "Sign up" : "Log in"}
                   </button>
