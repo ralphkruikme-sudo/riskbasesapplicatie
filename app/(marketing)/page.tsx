@@ -10,10 +10,7 @@ const fadeUp: Variants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.7,
-      ease: "easeOut",
-    },
+    transition: { duration: 0.7, ease: "easeOut" },
   },
 };
 
@@ -22,10 +19,7 @@ const fadeLeft: Variants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: {
-      duration: 0.75,
-      ease: "easeOut",
-    },
+    transition: { duration: 0.75, ease: "easeOut" },
   },
 };
 
@@ -34,19 +28,14 @@ const fadeRight: Variants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: {
-      duration: 0.75,
-      ease: "easeOut",
-    },
+    transition: { duration: 0.75, ease: "easeOut" },
   },
 };
 
 const stagger: Variants = {
   hidden: {},
   visible: {
-    transition: {
-      staggerChildren: 0.12,
-    },
+    transition: { staggerChildren: 0.12 },
   },
 };
 
@@ -130,65 +119,89 @@ function DotList({ items }: { items: string[] }) {
   );
 }
 
-function HeroTornado() {
+function HeroRibbonObject() {
   return (
-    <div className="pointer-events-none absolute right-[-4%] top-[-4%] hidden h-[760px] w-[440px] lg:block">
+    <div className="pointer-events-none absolute right-[-220px] top-1/2 hidden h-[820px] w-[640px] -translate-y-1/2 lg:block">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_50%,rgba(99,91,255,0.16)_0%,rgba(99,91,255,0.08)_24%,rgba(255,255,255,0)_68%)] blur-3xl" />
+
+      {/* wide back ribbon */}
       <motion.div
-        animate={{ rotate: [8, 14, 8], y: [0, -10, 0] }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0"
+        animate={{ rotate: [26, 32, 26], y: [0, -10, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[28%] top-[6%] h-[88%] w-[220px]"
       >
-        <motion.div
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-          className="absolute left-[16%] top-[2%] h-[94%] w-[70%]"
-          style={{ transformStyle: "preserve-3d" }}
-        >
-          <div className="absolute left-1/2 top-1/2 h-[118%] w-[90px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(128,92,255,0.00)_0%,rgba(128,92,255,0.96)_14%,rgba(97,70,255,0.95)_30%,rgba(190,171,255,0.78)_48%,rgba(103,78,255,0.96)_66%,rgba(134,97,255,0.92)_82%,rgba(128,92,255,0.00)_100%)] blur-[0.5px] opacity-90"
-            style={{
-              transform:
-                "translate(-50%, -50%) rotate(22deg) skewY(8deg)",
-              boxShadow:
-                "0 0 40px rgba(99,91,255,0.22), 0 0 120px rgba(99,91,255,0.18)",
-            }}
-          />
-          <div className="absolute left-1/2 top-1/2 h-[108%] w-[64px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(255,255,255,0.52)_12%,rgba(255,255,255,0.12)_26%,rgba(255,255,255,0.65)_48%,rgba(255,255,255,0.15)_68%,rgba(255,255,255,0.52)_86%,rgba(255,255,255,0)_100%)] opacity-80 blur-[1px]"
-            style={{
-              transform:
-                "translate(-50%, -50%) rotate(22deg) skewY(8deg)",
-            }}
-          />
-        </motion.div>
+        <div
+          className="absolute inset-0 opacity-80 blur-[0.5px]"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(213,203,255,0.24) 8%, rgba(118,94,255,0.90) 26%, rgba(241,236,255,0.80) 48%, rgba(120,95,255,0.94) 68%, rgba(207,198,255,0.26) 88%, rgba(255,255,255,0) 100%)",
+            clipPath:
+              "polygon(20% 0%, 66% 0%, 100% 14%, 78% 36%, 54% 50%, 80% 68%, 100% 86%, 70% 100%, 24% 100%, 0% 88%, 14% 66%, 38% 48%, 12% 24%, 0% 10%)",
+            transform: "rotate(18deg) skewY(4deg)",
+            borderRadius: "999px",
+            boxShadow:
+              "0 0 36px rgba(99,91,255,0.14), 0 0 120px rgba(99,91,255,0.10)",
+          }}
+        />
+      </motion.div>
 
-        <motion.div
-          animate={{ rotate: [360, 0] }}
-          transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-          className="absolute left-[8%] top-[6%] h-[88%] w-[74%]"
-        >
-          <div className="absolute left-1/2 top-1/2 h-[112%] w-[72px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(157,132,255,0.0)_10%,rgba(124,88,255,0.82)_28%,rgba(201,189,255,0.78)_52%,rgba(112,81,255,0.88)_74%,rgba(255,255,255,0)_100%)] opacity-80 blur-[0.5px]"
-            style={{
-              transform:
-                "translate(-50%, -50%) rotate(-18deg) skewY(-10deg)",
-              boxShadow:
-                "0 0 30px rgba(124,88,255,0.18), 0 0 100px rgba(124,88,255,0.12)",
-            }}
-          />
-        </motion.div>
+      {/* main front ribbon */}
+      <motion.div
+        animate={{ rotate: [8, 14, 8], y: [0, 8, 0] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[43%] top-[0%] h-[100%] w-[170px]"
+      >
+        <div
+          className="absolute inset-0 opacity-96 blur-[0.35px]"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(196,184,255,0.28) 8%, rgba(110,84,255,0.98) 22%, rgba(255,255,255,0.88) 40%, rgba(105,79,255,0.99) 58%, rgba(230,224,255,0.60) 80%, rgba(255,255,255,0) 100%)",
+            clipPath:
+              "polygon(26% 0%, 72% 0%, 100% 12%, 86% 28%, 62% 50%, 86% 73%, 100% 88%, 72% 100%, 26% 100%, 0% 86%, 14% 68%, 40% 48%, 14% 24%, 0% 10%)",
+            transform: "rotate(10deg) skewY(2deg)",
+            borderRadius: "999px",
+            boxShadow:
+              "0 0 40px rgba(99,91,255,0.18), 0 0 160px rgba(99,91,255,0.14)",
+          }}
+        />
+      </motion.div>
 
-        <motion.div
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
-          className="absolute left-[18%] top-[10%] h-[80%] w-[58%]"
-        >
-          <div className="absolute left-1/2 top-1/2 h-[100%] w-[38px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(240,235,255,0.66)_18%,rgba(255,255,255,0.1)_50%,rgba(240,235,255,0.72)_82%,rgba(255,255,255,0)_100%)] opacity-90 blur-[1px]"
-            style={{
-              transform:
-                "translate(-50%, -50%) rotate(14deg) skewY(6deg)",
-            }}
-          />
-        </motion.div>
+      {/* glossy highlight */}
+      <motion.div
+        animate={{ rotate: [10, 15, 10], y: [0, -6, 0] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[49%] top-[2%] h-[96%] w-[88px]"
+      >
+        <div
+          className="absolute inset-0 opacity-95 blur-[0.2px]"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.86) 14%, rgba(255,255,255,0.14) 28%, rgba(255,255,255,0.98) 48%, rgba(255,255,255,0.18) 66%, rgba(255,255,255,0.82) 86%, rgba(255,255,255,0) 100%)",
+            clipPath:
+              "polygon(34% 0%, 70% 0%, 100% 14%, 82% 34%, 58% 50%, 82% 67%, 100% 86%, 68% 100%, 34% 100%, 0% 86%, 18% 66%, 42% 48%, 18% 28%, 0% 12%)",
+            transform: "rotate(9deg) skewY(2deg)",
+            borderRadius: "999px",
+          }}
+        />
+      </motion.div>
 
-        <div className="absolute right-[18%] top-[16%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(99,91,255,0.20)_0%,rgba(99,91,255,0.10)_26%,rgba(99,91,255,0.05)_44%,rgba(255,255,255,0)_72%)] blur-2xl" />
+      {/* far side ribbon */}
+      <motion.div
+        animate={{ rotate: [-14, -20, -14], y: [0, 10, 0] }}
+        transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute left-[58%] top-[10%] h-[84%] w-[150px]"
+      >
+        <div
+          className="absolute inset-0 opacity-78 blur-[0.4px]"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(228,220,255,0.20) 12%, rgba(139,115,255,0.84) 34%, rgba(244,240,255,0.76) 54%, rgba(128,103,255,0.86) 74%, rgba(255,255,255,0) 100%)",
+            clipPath:
+              "polygon(24% 0%, 66% 0%, 100% 16%, 78% 38%, 56% 52%, 80% 68%, 100% 86%, 68% 100%, 24% 100%, 0% 86%, 20% 64%, 42% 48%, 18% 28%, 0% 10%)",
+            transform: "rotate(-14deg) skewY(-6deg)",
+            borderRadius: "999px",
+          }}
+        />
       </motion.div>
     </div>
   );
@@ -199,10 +212,10 @@ export default function HomePage() {
     <main className="bg-[#f6f7fb] text-black">
       {/* HERO */}
       <section className="relative overflow-hidden bg-white">
-        <div className="absolute inset-y-0 right-0 hidden w-[42%] bg-[#f5f6fb] lg:block" />
+        <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-[#f5f6fb] lg:block" />
 
-        <div className="mx-auto max-w-[1440px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
-          <div className="grid items-center gap-16 lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="mx-auto max-w-[1560px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
+          <div className="grid items-center gap-16 lg:grid-cols-[0.82fr_1.18fr]">
             <motion.div
               variants={fadeLeft}
               initial="hidden"
@@ -256,12 +269,10 @@ export default function HomePage() {
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, amount: 0.15 }}
-              className="relative min-h-[620px]"
+              className="relative min-h-[760px] overflow-visible pr-[320px]"
             >
-              <HeroTornado />
-
               <div className="relative z-10">
-                <div className="ml-auto max-w-[820px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+                <div className="ml-auto max-w-[980px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
                   <Image
                     src="/workspace.png"
                     alt="RiskBases workspace overview"
@@ -272,7 +283,7 @@ export default function HomePage() {
                   />
                 </div>
 
-                <div className="-mt-12 ml-10 max-w-[760px] overflow-hidden rounded-[22px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:ml-16">
+                <div className="-mt-16 ml-12 max-w-[920px] overflow-hidden rounded-[22px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:ml-20">
                   <Image
                     src="/project.png"
                     alt="RiskBases project overview"
@@ -282,6 +293,8 @@ export default function HomePage() {
                   />
                 </div>
               </div>
+
+              <HeroRibbonObject />
             </motion.div>
           </div>
         </div>

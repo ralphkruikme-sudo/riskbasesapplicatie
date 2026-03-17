@@ -343,10 +343,10 @@ Each item in the JSON array must use exactly this structure:
 
 export async function POST(
   _request: Request,
-  context: { params: Promise<{ projectId: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = await context.params;
+    const { projectId } = await params;
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
       return NextResponse.json(
