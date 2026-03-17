@@ -123,8 +123,8 @@ function HeroRibbonObject() {
   // Three smooth flowing silk ribbons like the Stripe reference — wide sweeping curves, full height
   return (
     <div
-      className="pointer-events-none absolute right-[-180px] top-1/2 hidden -translate-y-1/2 lg:block"
-      style={{ width: 420, height: 960, zIndex: 20 }}
+      className="pointer-events-none absolute inset-0 hidden lg:block"
+      style={{ width: "100%", height: "100%", zIndex: 0 }}
     >
       {/* soft ambient glow */}
       <div
@@ -264,6 +264,11 @@ export default function HomePage() {
       <section className="relative overflow-hidden bg-white">
         <div className="absolute inset-y-0 right-0 hidden w-[46%] bg-[#f5f6fb] lg:block" />
 
+        {/* Ribbon — sits behind content, pinned to right edge of section */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[380px] lg:block" style={{ zIndex: 0 }}>
+          <HeroRibbonObject />
+        </div>
+
         <div className="mx-auto max-w-[1560px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
           <div className="grid items-center gap-16 lg:grid-cols-[0.82fr_1.18fr]">
             <motion.div
@@ -344,7 +349,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <HeroRibbonObject />
             </motion.div>
           </div>
         </div>
