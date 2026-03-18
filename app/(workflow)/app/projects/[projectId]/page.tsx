@@ -1,118 +1,153 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Bell,
-  CheckCheck,
-  ClipboardList,
-  Clock,
-  Loader2,
-  RefreshCw,
-  Shield,
-  ShieldAlert,
-  Target,
-  TrendingUp,
-  Users,
-  Zap,
-} from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import {
+  ArrowRight,
+  Bell,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  FileWarning,
+  Loader2,
+  MapPin,
+  Wrench,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 type Project = {
   id: string;
   name: string;
-  status: string | null;
+  status?: string | null;
+  project_code?: string | null;
   description?: string | null;
-  project_value?: number | null;
+  client_name?: string | null;
+  project_type?: string | null;
+  contract_type?: string | null;
+  project_value?: number | string | null;
   start_date?: string | null;
   end_date?: string | null;
-  client_name?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  site_type?: string | null;
+  permit_required?: boolean | null;
+  intake_method?: string | null;
+  project_phase?: string | null;
+  planning_notes?: string | null;
+  critical_dependencies?: string | null;
+  main_contractor?: string | null;
 };
-
-type RiskLevel = "low" | "medium" | "high";
-type RiskStatus = "open" | "monitoring" | "mitigated" | "closed" | "archived";
-type ActionStatus = "open" | "in_progress" | "blocked" | "done" | "overdue";
-type ActionPriority = "low" | "medium" | "high" | "critical";
 
 type ProjectRisk = {
   id: string;
-  risk_code: string | null;
+  project_id: string;
   title: string;
-  category: string | null;
-  probability: number;
-  impact: number;
-  score: number;
-  level: RiskLevel;
-  status: RiskStatus;
-  phase: string | null;
-  due_review_date: string | null;
-  created_at: string;
-  updated_at: string;
+  description?: string | null;
+  category?: string | null;
+  probability?: number | null;
+  impact?: number | null;
+  score?: number | null;
+  level?: string | null;
+  status?: string | null;
+  phase?: string | null;
+  due_review_date?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  suggested_action?: string | null;
 };
 
 type RiskAction = {
   id: string;
+  project_id: string;
+  risk_id?: string | null;
   title: string;
-  status: ActionStatus;
-  priority: ActionPriority;
-  due_date: string | null;
-  created_at: string;
-};
-
-type Notification = {
-  id: string;
-  title: string;
-  body: string | null;
-  is_read: boolean;
-  created_at: string;
+  description?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  due_date?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
 
 type Stakeholder = {
   id: string;
+  project_id: string;
   name: string;
+  organization?: string | null;
+  role?: string | null;
 };
 
 type TimelineEvent = {
   id: string;
+  project_id: string;
   title: string;
-  type: string;
-  status: string;
-  start_date: string;
-  end_date: string | null;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  type?: string | null;
+  status?: string | null;
 };
 
-type InsightSeverity = "critical" | "warning" | "info" | "positive";
-
-type ProjectInsight = {
+type Notification = {
   id: string;
-  severity: InsightSeverity;
-  title: string;
-  description: string;
-  stat?: string;
-  href?: string;
-  ctaLabel?: string;
+  project_id?: string | null;
+  title?: string | null;
+  message?: string | null;
+  is_read?: boolean | null;
+  created_at?: string | null;
 };
 
-function timeAgo(d: string) {
-  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+function fmtDate(v?: string | null) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-function fmtEur(v: number) {
-  if (v >= 1e6) return `€ ${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `€ ${(v / 1e3).toFixed(0)}K`;
-  return `€ ${v}`;
+function fmtShort(v?: string | null) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function timeAgo(v?: string | null) {
+  if (!v) return "—";
+  const diff = Math.floor((Date.now() - new Date(v).getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function formatMoney(v?: number | string | null) {
+  if (v === null || v === undefined || v === "") return "—";
+  const num = typeof v === "number" ? v : Number(String(v).replace(/[^\d.-]/g, ""));
+  if (Number.isNaN(num)) return String(v);
+  return new Intl.NumberFormat("nl-NL", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
+function compactMoney(v?: number | string | null) {
+  if (v === null || v === undefined || v === "") return "—";
+  const num = typeof v === "number" ? v : Number(String(v).replace(/[^\d.-]/g, ""));
+  if (Number.isNaN(num)) return String(v);
+  if (num >= 1_000_000) return `€ ${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1000) return `€ ${(num / 1000).toFixed(0)}K`;
+  return `€ ${num}`;
 }
 
 function isOverdue(date?: string | null) {
@@ -125,215 +160,166 @@ function daysUntil(date?: string | null) {
   return Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
 }
 
-function getInsightStyles(severity: InsightSeverity) {
-  switch (severity) {
+function normalizeLevel(level?: string | null, score?: number | null) {
+  const raw = String(level ?? "").trim().toLowerCase();
+
+  if (["critical", "kritiek", "urgent"].includes(raw)) return "critical";
+  if (["high", "hoog"].includes(raw)) return "high";
+  if (["medium", "middel", "gemiddeld"].includes(raw)) return "medium";
+  if (["low", "laag"].includes(raw)) return "low";
+
+  if (typeof score === "number") {
+    if (score >= 15) return "critical";
+    if (score >= 9) return "high";
+    if (score >= 5) return "medium";
+    return "low";
+  }
+
+  return "medium";
+}
+
+function levelStyle(level: string) {
+  switch (level) {
     case "critical":
-      return {
-        border: "#fecaca",
-        bg: "#fef2f2",
-        iconBg: "#fee2e2",
-        iconColor: "#dc2626",
-        pillBg: "#fff1f2",
-        pillColor: "#b91c1c",
-      };
-    case "warning":
-      return {
-        border: "#fde68a",
-        bg: "#fffbeb",
-        iconBg: "#fef3c7",
-        iconColor: "#d97706",
-        pillBg: "#fff7ed",
-        pillColor: "#b45309",
-      };
-    case "positive":
-      return {
-        border: "#bbf7d0",
-        bg: "#f0fdf4",
-        iconBg: "#dcfce7",
-        iconColor: "#16a34a",
-        pillBg: "#ecfdf5",
-        pillColor: "#15803d",
-      };
+      return { text: "#b91c1c", bg: "#fef2f2", border: "#fecaca", dot: "#ef4444" };
+    case "high":
+      return { text: "#c2410c", bg: "#fff7ed", border: "#fdba74", dot: "#f97316" };
+    case "medium":
+      return { text: "#a16207", bg: "#fefce8", border: "#fde68a", dot: "#eab308" };
+    case "low":
+      return { text: "#15803d", bg: "#f0fdf4", border: "#86efac", dot: "#22c55e" };
     default:
-      return {
-        border: "#ddd6fe",
-        bg: "#f5f3ff",
-        iconBg: "#ede9fe",
-        iconColor: "#7c3aed",
-        pillBg: "#f5f3ff",
-        pillColor: "#6d28d9",
-      };
+      return { text: "#334155", bg: "#f8fafc", border: "#e2e8f0", dot: "#64748b" };
   }
 }
 
-function buildProjectInsights(params: {
-  projectId: string;
-  risks: ProjectRisk[];
-  actions: RiskAction[];
-  notifications: Notification[];
-  stakeholders: Stakeholder[];
-  timeline: TimelineEvent[];
-}): ProjectInsight[] {
-  const { projectId, risks, actions, notifications, stakeholders, timeline } = params;
-  const insights: ProjectInsight[] = [];
+function getProjectRange(project: Project | null, timeline: TimelineEvent[]) {
+  const values: number[] = [];
 
-  const highRisks = risks.filter((r) => r.level === "high");
-  const openRisks = risks.filter((r) =>
-    ["open", "monitoring"].includes((r.status ?? "").toLowerCase())
-  );
-  const overdueActions = actions.filter(
-    (a) => (a.status ?? "").toLowerCase() !== "done" && isOverdue(a.due_date)
-  );
-  const blockedActions = actions.filter((a) => a.status === "blocked");
-  const highPriorityActions = actions.filter(
-    (a) => a.priority === "critical" || a.priority === "high"
-  );
-  const upcomingReviews = risks.filter((r) => {
-    const d = daysUntil(r.due_review_date);
-    return d !== null && d >= 0 && d <= 14;
+  if (project?.start_date) values.push(new Date(project.start_date).getTime());
+  if (project?.end_date) values.push(new Date(project.end_date).getTime());
+
+  timeline.forEach((item) => {
+    if (item.start_date) values.push(new Date(item.start_date).getTime());
+    if (item.end_date) values.push(new Date(item.end_date).getTime());
   });
-  const delayedTimeline = timeline.filter(
-    (t) => (t.status ?? "").toLowerCase() === "delayed"
-  );
-  const unreadNotifications = notifications.filter((n) => !n.is_read);
 
-  if (highRisks.length > 0) {
-    insights.push({
-      id: "high-risks",
-      severity: "critical",
-      title: "High-risk exposure requires action",
-      description: `${highRisks.length} high risk item${highRisks.length > 1 ? "s" : ""} detected${
-        highRisks[0]?.title ? `, led by "${highRisks[0].title}"` : ""
-      }.`,
-      stat: `${highRisks.length} high`,
-      href: `/app/projects/${projectId}/risk-register`,
-      ctaLabel: "Open risk register",
-    });
+  const valid = values.filter((v) => !Number.isNaN(v)).sort((a, b) => a - b);
+
+  if (!valid.length) {
+    const now = new Date();
+    return {
+      min: new Date(now.getFullYear(), now.getMonth(), 1),
+      max: new Date(now.getFullYear(), now.getMonth() + 5, 0),
+    };
   }
 
-  if (overdueActions.length > 0) {
-    insights.push({
-      id: "overdue-actions",
-      severity: "warning",
-      title: "Mitigation follow-up overdue",
-      description: `${overdueActions.length} action${
-        overdueActions.length > 1 ? "s are" : " is"
-      } overdue and should be reassigned or completed.`,
-      stat: `${overdueActions.length} overdue`,
-      href: `/app/projects/${projectId}/actions`,
-      ctaLabel: "Open actions",
-    });
-  }
+  const min = new Date(valid[0]);
+  const max = new Date(valid[valid.length - 1]);
+  min.setDate(1);
+  max.setMonth(max.getMonth() + 1);
+  max.setDate(0);
 
-  if (upcomingReviews.length > 0) {
-    insights.push({
-      id: "upcoming-reviews",
-      severity: "info",
-      title: "Risk reviews due soon",
-      description: `${upcomingReviews.length} review${
-        upcomingReviews.length > 1 ? "s are" : " is"
-      } scheduled within the next 14 days.`,
-      stat: `${upcomingReviews.length} due`,
-      href: `/app/projects/${projectId}/risk-register`,
-      ctaLabel: "Plan review",
-    });
-  }
-
-  if (stakeholders.length === 0 && (openRisks.length > 0 || actions.length > 0)) {
-    insights.push({
-      id: "no-stakeholders",
-      severity: "warning",
-      title: "No stakeholders linked",
-      description: "This project has active risk activity but no stakeholders assigned yet.",
-      stat: "0 linked",
-      href: `/app/projects/${projectId}/stakeholders`,
-      ctaLabel: "Add stakeholders",
-    });
-  }
-
-  if (delayedTimeline.length > 0) {
-    insights.push({
-      id: "timeline-delayed",
-      severity: "warning",
-      title: "Timeline pressure detected",
-      description: `${delayedTimeline.length} timeline item${
-        delayedTimeline.length > 1 ? "s are" : " is"
-      } marked as delayed.`,
-      stat: `${delayedTimeline.length} delayed`,
-      href: `/app/projects/${projectId}/project-timeline`,
-      ctaLabel: "Open timeline",
-    });
-  }
-
-  if (blockedActions.length > 0 && highPriorityActions.length > 0) {
-    insights.push({
-      id: "blocked-actions",
-      severity: "critical",
-      title: "Critical actions are blocked",
-      description: `${blockedActions.length} blocked action${
-        blockedActions.length > 1 ? "s" : ""
-      } found while priority remains high.`,
-      stat: `${blockedActions.length} blocked`,
-      href: `/app/projects/${projectId}/actions`,
-      ctaLabel: "Resolve blockers",
-    });
-  }
-
-  if (!insights.length) {
-    insights.push({
-      id: "healthy",
-      severity: "positive",
-      title: "Project controls look stable",
-      description:
-        unreadNotifications.length > 0
-          ? `No urgent control gaps detected. ${unreadNotifications.length} unread notification${
-              unreadNotifications.length > 1 ? "s are" : " is"
-            } waiting for review.`
-          : "No urgent control gaps detected based on current project data.",
-      stat: "Stable",
-    });
-  }
-
-  return insights.slice(0, 4);
+  return { min, max };
 }
 
-function ScoreRing({ score, max = 25 }: { score: number; max?: number }) {
-  const pct = Math.min(score / max, 1);
-  const r = 36;
-  const c = 2 * Math.PI * r;
-  const color = score >= 15 ? "#ef4444" : score >= 8 ? "#f59e0b" : "#22c55e";
-  const label = score >= 15 ? "High" : score >= 8 ? "Medium" : "Low";
+function pctPos(dateStr: string, min: Date, max: Date) {
+  const d = new Date(dateStr).getTime();
+  const start = min.getTime();
+  const end = max.getTime();
+  if (Number.isNaN(d) || end <= start) return 0;
+  return ((d - start) / (end - start)) * 100;
+}
 
+function clamp(num: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, num));
+}
+
+function getMonthMarkers(min: Date, max: Date) {
+  const markers: { label: string; pct: number }[] = [];
+  const d = new Date(min);
+  d.setDate(1);
+
+  while (d <= max) {
+    markers.push({
+      label: d.toLocaleDateString("nl-NL", { month: "short", year: "2-digit" }),
+      pct: pctPos(d.toISOString(), min, max),
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  return markers;
+}
+
+function StatsCard({
+  title,
+  value,
+  subtitle,
+}: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+}) {
   return (
-    <div style={{ position: "relative", width: 96, height: 96, flexShrink: 0 }}>
-      <svg width={96} height={96} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={48} cy={48} r={r} fill="none" stroke="#f1f5f9" strokeWidth={8} />
-        <circle
-          cx={48}
-          cy={48}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={8}
-          strokeDasharray={`${pct * c} ${c}`}
-          strokeLinecap="round"
-        />
-      </svg>
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        padding: 16,
+        minHeight: 108,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{title}</div>
+      <div style={{ marginTop: 10, fontSize: 30, lineHeight: 1, fontWeight: 800, color: "#0f172a" }}>
+        {value}
+      </div>
+      {subtitle ? (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#64748b", lineHeight: 1.4 }}>{subtitle}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e5e7eb",
+        borderRadius: 20,
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
-          position: "absolute",
-          inset: 0,
+          padding: "16px 18px",
+          borderBottom: "1px solid #eef2f7",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
+          gap: 12,
         }}
       >
-        <span style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
-          {score}
-        </span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8" }}>{label}</span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>{title}</div>
+          {subtitle ? (
+            <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>{subtitle}</div>
+          ) : null}
+        </div>
+        {right}
       </div>
+      <div style={{ padding: 18 }}>{children}</div>
     </div>
   );
 }
@@ -341,430 +327,398 @@ function ScoreRing({ score, max = 25 }: { score: number; max?: number }) {
 function RiskMatrix({ risks }: { risks: ProjectRisk[] }) {
   const cells = Array.from({ length: 5 }, (_, row) =>
     Array.from({ length: 5 }, (_, col) => {
-      const p = col + 1;
-      const i = 5 - row;
-      const here = risks.filter((r) => r.probability === p && r.impact === i);
-      const score = p * i;
+      const probability = col + 1;
+      const impact = 5 - row;
+      const here = risks.filter(
+        (r) => r.probability === probability && r.impact === impact
+      );
+      const score = probability * impact;
+
       const bg = score >= 15 ? "#fef2f2" : score >= 8 ? "#fffbeb" : "#f0fdf4";
       const border = score >= 15 ? "#fecaca" : score >= 8 ? "#fde68a" : "#bbf7d0";
-      return { p, i, risks: here, bg, border };
+
+      return { probability, impact, here, bg, border };
     })
   );
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
-        <span
-          style={{
-            fontSize: 10,
-            color: "#94a3b8",
-            writingMode: "vertical-rl",
-            transform: "rotate(180deg)",
-            marginRight: 4,
-          }}
-        >
-          IMPACT →
-        </span>
-        <div style={{ flex: 1 }}>
-          {cells.map((row, ri) => (
-            <div key={ri} style={{ display: "flex", gap: 3, marginBottom: 3 }}>
-              {row.map((cell, ci) => (
-                <div
-                  key={ci}
-                  style={{
-                    flex: 1,
-                    aspectRatio: "1",
-                    borderRadius: 6,
-                    background: cell.bg,
-                    border: `1px solid ${cell.border}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                    minHeight: 32,
-                  }}
-                >
-                  {cell.risks.length > 0 && (
-                    <div
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background:
-                          cell.risks[0].level === "high"
-                            ? "#ef4444"
-                            : cell.risks[0].level === "medium"
-                            ? "#f59e0b"
-                            : "#22c55e",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 9,
-                        fontWeight: 800,
-                        color: "white",
-                      }}
-                    >
-                      {cell.risks.length}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
-          <div style={{ display: "flex", gap: 3, marginTop: 2 }}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <div key={n} style={{ flex: 1, textAlign: "center", fontSize: 10, color: "#94a3b8" }}>
-                {n}
-              </div>
-            ))}
-          </div>
-          <p style={{ textAlign: "center", fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
-            PROBABILITY →
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MiniGantt({ events }: { events: TimelineEvent[] }) {
-  if (events.length === 0) {
-    return (
-      <div style={{ textAlign: "center", padding: "20px 0", color: "#94a3b8", fontSize: 13 }}>
-        No timeline events ·{" "}
-        <Link
-          href="#"
-          style={{ color: "#7c3aed", textDecoration: "none", fontWeight: 600 }}
-        >
-          Add one
-        </Link>
-      </div>
-    );
-  }
-
-  const dates = events.flatMap((e) => [
-    new Date(e.start_date),
-    e.end_date ? new Date(e.end_date) : new Date(e.start_date),
-  ]);
-  const min = new Date(Math.min(...dates.map((d) => d.getTime())));
-  const max = new Date(Math.max(...dates.map((d) => d.getTime())));
-  const range = max.getTime() - min.getTime() || 1;
-  const pct = (d: string) =>
-    Math.max(0, Math.min(100, ((new Date(d).getTime() - min.getTime()) / range) * 100));
-  const todayPct = Math.max(
-    0,
-    Math.min(100, ((Date.now() - min.getTime()) / range) * 100)
-  );
-
-  const TYPE_COLOR: Record<string, string> = {
-    phase: "#7c3aed",
-    milestone: "#f59e0b",
-    review: "#3b82f6",
-    delivery: "#22c55e",
-  };
-
-  const STATUS_BG: Record<string, string> = {
-    completed: "#22c55e",
-    in_progress: "#3b82f6",
-    delayed: "#ef4444",
-    planned: "#94a3b8",
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {events.slice(0, 5).map((ev) => {
-        const left = pct(ev.start_date);
-        const right = pct(ev.end_date || ev.start_date);
-        const width = Math.max(right - left, 2);
-        const color = TYPE_COLOR[ev.type] ?? "#7c3aed";
-
-        return (
-          <div key={ev.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 110, flexShrink: 0 }}>
-              <p
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#1e293b",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {ev.title}
-              </p>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                <div
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: STATUS_BG[ev.status] ?? "#94a3b8",
-                  }}
-                />
-                <span style={{ fontSize: 10, color: "#94a3b8" }}>
-                  {ev.status.replace("_", " ")}
-                </span>
-              </div>
-            </div>
-
-            <div
-              style={{
-                flex: 1,
-                height: 22,
-                background: "#f8fafc",
-                borderRadius: 6,
-                position: "relative",
-                overflow: "visible",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${todayPct}%`,
-                  top: -3,
-                  bottom: -3,
-                  width: 1.5,
-                  background: "#ef444470",
-                  zIndex: 2,
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  left: `${left}%`,
-                  width: `${width}%`,
-                  height: 22,
-                  background: color,
-                  borderRadius: 5,
-                  opacity: 0.85,
-                  display: "flex",
-                  alignItems: "center",
-                  paddingLeft: 6,
-                  minWidth: 6,
-                }}
-              >
-                {width > 10 && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "white",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {new Date(ev.start_date).toLocaleDateString("nl-NL", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
-        {[
-          ["phase", "#7c3aed"],
-          ["milestone", "#f59e0b"],
-          ["review", "#3b82f6"],
-          ["delivery", "#22c55e"],
-        ].map(([type, color]) => (
-          <div key={type} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: color as string }} />
-            <span style={{ fontSize: 10, color: "#94a3b8" }}>{type}</span>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "24px repeat(5, 1fr)",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
+        <div />
+        {[1, 2, 3, 4, 5].map((p) => (
+          <div
+            key={`prob-${p}`}
+            style={{
+              textAlign: "center",
+              fontSize: 11,
+              color: "#64748b",
+              fontWeight: 700,
+            }}
+          >
+            {p}
           </div>
         ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{ width: 10, height: 2, background: "#ef4444", opacity: 0.5 }} />
-          <span style={{ fontSize: 10, color: "#94a3b8" }}>today</span>
-        </div>
+
+        {cells.map((row, rIdx) => (
+          <Fragment key={`row-${rIdx}`}>
+            <div
+              style={{
+                fontSize: 11,
+                color: "#64748b",
+                fontWeight: 700,
+                textAlign: "center",
+              }}
+            >
+              {5 - rIdx}
+            </div>
+
+            {row.map((cell) => (
+              <div
+                key={`cell-${cell.probability}-${cell.impact}`}
+                style={{
+                  minHeight: 56,
+                  borderRadius: 12,
+                  border: `1px solid ${cell.border}`,
+                  background: cell.bg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
+                  {cell.here.length}
+                </div>
+                <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                  P{cell.probability} × I{cell.impact}
+                </div>
+              </div>
+            ))}
+          </Fragment>
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 10,
+          fontSize: 11,
+          color: "#64748b",
+          fontWeight: 700,
+        }}
+      >
+        <span>Impact ↑</span>
+        <span>Probability →</span>
       </div>
     </div>
   );
 }
 
-function StatCard({
-  icon,
-  title,
-  value,
-  subtext,
-  iconBg,
-  iconColor,
+function CompactTimeline({
+  project,
+  timeline,
+  risks,
 }: {
-  icon: React.ReactNode;
-  title: string;
-  value: string | number;
-  subtext?: string;
-  iconBg: string;
-  iconColor: string;
+  project: Project | null;
+  timeline: TimelineEvent[];
+  risks: ProjectRisk[];
 }) {
+  const range = useMemo(() => getProjectRange(project, timeline), [project, timeline]);
+  const markers = useMemo(() => getMonthMarkers(range.min, range.max), [range.min, range.max]);
+
+  const phases = useMemo(
+    () =>
+      timeline
+        .filter((t) => (t.type ?? "phase").toLowerCase() === "phase")
+        .sort((a, b) => String(a.start_date ?? "").localeCompare(String(b.start_date ?? "")))
+        .slice(0, 6),
+    [timeline]
+  );
+
+  const topRisks = useMemo(
+    () =>
+      [...risks]
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .slice(0, 4),
+    [risks]
+  );
+
+  const todayPct = clamp(pctPos(new Date().toISOString(), range.min, range.max), 0, 100);
+
   return (
-    <div
-      style={{
-        background: "white",
-        border: "1px solid #e8eaf0",
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 12,
-            background: iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: iconColor,
-          }}
-        >
-          {icon}
+    <div>
+      <div style={{ display: "flex", marginBottom: 10, paddingLeft: 180 }}>
+        <div style={{ flex: 1, position: "relative", height: 18 }}>
+          {markers.map((m, i) => (
+            <span
+              key={`marker-${i}`}
+              style={{
+                position: "absolute",
+                left: `calc(${m.pct}% - 10px)`,
+                fontSize: 10,
+                color: "#94a3b8",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {m.label}
+            </span>
+          ))}
         </div>
       </div>
-      <p style={{ marginTop: 14, fontSize: 12, fontWeight: 700, color: "#64748b" }}>{title}</p>
-      <p style={{ marginTop: 4, fontSize: 28, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>
-        {value}
-      </p>
-      {subtext && <p style={{ marginTop: 8, fontSize: 11, color: "#94a3b8" }}>{subtext}</p>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {phases.map((phase) => {
+          const left = phase.start_date ? pctPos(phase.start_date, range.min, range.max) : 0;
+          const right = phase.end_date ? pctPos(phase.end_date, range.min, range.max) : left + 8;
+          const width = Math.max(6, right - left);
+
+          return (
+            <div key={phase.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 170, flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{phase.title}</div>
+                <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>
+                  {fmtShort(phase.start_date)} — {fmtShort(phase.end_date)}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  position: "relative",
+                  flex: 1,
+                  height: 24,
+                  borderRadius: 999,
+                  background: "#f8fafc",
+                  border: "1px solid #eef2f7",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${todayPct}%`,
+                    top: 0,
+                    bottom: 0,
+                    width: 2,
+                    background: "#ef4444",
+                    opacity: 0.35,
+                  }}
+                />
+                {markers.map((m, i) => (
+                  <div
+                    key={`grid-${i}`}
+                    style={{
+                      position: "absolute",
+                      left: `${m.pct}%`,
+                      top: 0,
+                      bottom: 0,
+                      width: 1,
+                      background: "#eef2f7",
+                    }}
+                  />
+                ))}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: `${left}%`,
+                    width: `${width}%`,
+                    top: 4,
+                    height: 14,
+                    minWidth: 12,
+                    borderRadius: 999,
+                    background: "#4f46e5",
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        {topRisks.length > 0 && (
+          <div style={{ marginTop: 4, paddingTop: 12, borderTop: "1px solid #eef2f7" }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b", marginBottom: 10 }}>
+              Risk pressure
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {topRisks.map((risk, idx) => {
+                const phaseIndex = Math.max(
+                  0,
+                  phases.findIndex(
+                    (p) => p.title.toLowerCase() === String(risk.phase ?? "").toLowerCase()
+                  )
+                );
+
+                const left = phases.length ? (phaseIndex / phases.length) * 100 : idx * 18;
+                const width = Math.max(12, 100 / Math.max(phases.length || 4, 4));
+                const level = normalizeLevel(risk.level, risk.score);
+                const s = levelStyle(level);
+
+                return (
+                  <div key={risk.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 170, flexShrink: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {risk.title}
+                      </div>
+                      <div style={{ marginTop: 3, fontSize: 11, color: "#64748b" }}>
+                        {risk.phase ?? "Project-wide"} · score {risk.score ?? "—"}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        position: "relative",
+                        flex: 1,
+                        height: 12,
+                        borderRadius: 999,
+                        background: "#f8fafc",
+                        border: "1px solid #eef2f7",
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${left}%`,
+                          width: `${width}%`,
+                          top: 0,
+                          bottom: 0,
+                          minWidth: 20,
+                          borderRadius: 999,
+                          background: s.dot,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function ProjectDashboardPage() {
+export default function ProjectOverviewPage() {
   const params = useParams();
   const projectId = params.projectId as string;
 
   const [project, setProject] = useState<Project | null>(null);
   const [risks, setRisks] = useState<ProjectRisk[]>([]);
   const [actions, setActions] = useState<RiskAction[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  async function loadDashboard(isRefresh = false) {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+  async function loadPage() {
+    if (!projectId) return;
+    setLoading(true);
 
-    setErrorMessage("");
+    const [
+      projectRes,
+      risksRes,
+      actionsRes,
+      stakeholdersRes,
+      timelineRes,
+      notificationsRes,
+    ] = await Promise.all([
+      supabase.from("projects").select("*").eq("id", projectId).single(),
+      supabase
+        .from("project_risks")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("score", { ascending: false }),
+      supabase
+        .from("risk_actions")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("due_date", { ascending: true }),
+      supabase
+        .from("project_stakeholders")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("name", { ascending: true }),
+      supabase
+        .from("project_timeline")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("start_date", { ascending: true }),
+      supabase
+        .from("notifications")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ]);
 
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const [{ data: pd }, { data: rd }, { data: ad }, { data: nd }, { data: sd }, { data: td }] =
-        await Promise.all([
-          supabase
-            .from("projects")
-            .select("id,name,status,description,project_value,start_date,end_date,client_name")
-            .eq("id", projectId)
-            .single(),
-
-          supabase
-            .from("project_risks")
-            .select(
-              "id,risk_code,title,category,probability,impact,score,level,status,phase,due_review_date,created_at,updated_at"
-            )
-            .eq("project_id", projectId)
-            .order("score", { ascending: false }),
-
-          supabase
-            .from("risk_actions")
-            .select("id,title,status,priority,due_date,created_at")
-            .eq("project_id", projectId)
-            .order("created_at", { ascending: false }),
-
-          supabase
-            .from("notifications")
-            .select("id,title,body,is_read,created_at")
-            .eq("user_id", user.id)
-            .eq("project_id", projectId)
-            .order("created_at", { ascending: false })
-            .limit(8),
-
-          supabase.from("project_stakeholders").select("id,name").eq("project_id", projectId),
-
-          supabase
-            .from("project_timeline")
-            .select("id,title,type,status,start_date,end_date")
-            .eq("project_id", projectId)
-            .order("start_date", { ascending: true }),
-        ]);
-
-      if (pd) setProject(pd as Project);
-      setRisks((rd ?? []) as ProjectRisk[]);
-      setActions((ad ?? []) as RiskAction[]);
-      setNotifications((nd ?? []) as Notification[]);
-      setStakeholders((sd ?? []) as Stakeholder[]);
-      setTimeline((td ?? []) as TimelineEvent[]);
-    } catch (e: any) {
-      setErrorMessage(e?.message || "Load error");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    setProject((projectRes.data ?? null) as Project | null);
+    setRisks((risksRes.data ?? []) as ProjectRisk[]);
+    setActions((actionsRes.data ?? []) as RiskAction[]);
+    setStakeholders((stakeholdersRes.data ?? []) as Stakeholder[]);
+    setTimeline((timelineRes.data ?? []) as TimelineEvent[]);
+    setNotifications((notificationsRes.data ?? []) as Notification[]);
+    setLoading(false);
   }
 
   useEffect(() => {
-    if (projectId) loadDashboard();
+    loadPage();
   }, [projectId]);
 
   const stats = useMemo(() => {
-    const totalRisks = risks.length;
-    const highRisks = risks.filter((r) => r.level === "high").length;
-    const mediumRisks = risks.filter((r) => r.level === "medium").length;
-    const lowRisks = risks.filter((r) => r.level === "low").length;
-    const openActions = actions.filter(
-      (a) => a.status === "open" || a.status === "in_progress"
-    ).length;
+    const criticalRisks = risks.filter((r) => normalizeLevel(r.level, r.score) === "critical").length;
+    const highRisks = risks.filter((r) => normalizeLevel(r.level, r.score) === "high").length;
+    const mediumRisks = risks.filter((r) => normalizeLevel(r.level, r.score) === "medium").length;
+    const lowRisks = risks.filter((r) => normalizeLevel(r.level, r.score) === "low").length;
+
+    const openActions = actions.filter((a) => (a.status ?? "").toLowerCase() !== "done").length;
     const overdueActions = actions.filter(
-      (a) => a.due_date && a.status !== "done" && new Date(a.due_date).getTime() < Date.now()
+      (a) => (a.status ?? "").toLowerCase() !== "done" && isOverdue(a.due_date)
     ).length;
-    const completedActions = actions.filter((a) => a.status === "done").length;
+
     const upcomingReviews = risks.filter((r) => {
-      if (!r.due_review_date) return false;
-      const d = new Date(r.due_review_date).getTime();
-      return d >= Date.now() && d <= Date.now() + 14 * 86400000;
+      const d = daysUntil(r.due_review_date);
+      return d !== null && d >= 0 && d <= 14;
     }).length;
-    const unreadNotifications = notifications.filter((n) => !n.is_read).length;
-    const avgScore = totalRisks > 0 ? risks.reduce((s, r) => s + r.score, 0) / totalRisks : 0;
-    const avgRiskScore = avgScore.toFixed(1);
-    const projectDays =
-      project?.start_date && project?.end_date
-        ? Math.ceil(
-            (new Date(project.end_date).getTime() - new Date(project.start_date).getTime()) /
-              86400000
-          )
-        : null;
+
+    const avgScore = risks.length
+      ? risks.reduce((sum, r) => sum + (r.score ?? 0), 0) / risks.length
+      : 0;
+
     const daysLeft = project?.end_date
       ? Math.ceil((new Date(project.end_date).getTime() - Date.now()) / 86400000)
       : null;
 
     return {
-      totalRisks,
+      totalRisks: risks.length,
+      criticalRisks,
       highRisks,
       mediumRisks,
       lowRisks,
       openActions,
       overdueActions,
-      completedActions,
       upcomingReviews,
-      unreadNotifications,
-      avgRiskScore,
+      unreadNotifications: notifications.filter((n) => !n.is_read).length,
       avgScore,
       totalStakeholders: stakeholders.length,
-      projectDays,
       daysLeft,
     };
   }, [risks, actions, notifications, stakeholders, project]);
@@ -773,57 +727,111 @@ export default function ProjectDashboardPage() {
 
   const urgentActions = useMemo(
     () =>
-      [...actions]
+      actions
         .filter((a) => {
-          const overdue =
-            a.due_date && a.status !== "done"
-              ? new Date(a.due_date).getTime() < Date.now()
-              : false;
-          return overdue || a.priority === "critical" || a.priority === "high";
+          const st = (a.status ?? "").toLowerCase();
+          return st === "blocked" || (st !== "done" && isOverdue(a.due_date)) || a.priority === "high";
         })
         .slice(0, 5),
     [actions]
   );
 
-  const categoryDist = useMemo(() => {
+  const recentActivity = useMemo(() => {
+    const merged = [
+      ...notifications.map((n) => ({
+        id: `n-${n.id}`,
+        type: "notification" as const,
+        title: n.title || "Notification",
+        subtitle: n.message || "Project notification",
+        at: n.created_at || new Date().toISOString(),
+      })),
+      ...actions.map((a) => ({
+        id: `a-${a.id}`,
+        type: "action" as const,
+        title: a.title,
+        subtitle: a.status ? `Action status: ${a.status}` : "Action updated",
+        at: a.updated_at || a.created_at || new Date().toISOString(),
+      })),
+      ...risks.map((r) => ({
+        id: `r-${r.id}`,
+        type: "risk" as const,
+        title: r.title,
+        subtitle: r.status ? `Risk status: ${r.status}` : "Risk updated",
+        at: r.updated_at || r.created_at || new Date().toISOString(),
+      })),
+    ];
+
+    return merged
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+      .slice(0, 8);
+  }, [notifications, actions, risks]);
+
+  const categoryDistribution = useMemo(() => {
     const map = new Map<string, number>();
+
     risks.forEach((r) => {
       const key = r.category || "Uncategorized";
       map.set(key, (map.get(key) || 0) + 1);
     });
+
     return Array.from(map.entries())
       .map(([label, count]) => ({ label, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   }, [risks]);
 
-  const projectInsights = useMemo(() => {
-    return buildProjectInsights({
-      projectId,
-      risks,
-      actions,
-      notifications,
-      stakeholders,
-      timeline,
-    });
-  }, [projectId, risks, actions, notifications, stakeholders, timeline]);
+  const mainInsight = useMemo(() => {
+    if (stats.overdueActions > 0) {
+      return {
+        title: "Resolve overdue mitigation actions",
+        body: `${stats.overdueActions} action${stats.overdueActions > 1 ? "s are" : " is"} overdue and should be closed first.`,
+        cta: "Open actions",
+        href: `/app/projects/${projectId}/actions`,
+      };
+    }
+
+    if (stats.criticalRisks > 0 || stats.highRisks > 0) {
+      return {
+        title: "Run focused risk review",
+        body: `${stats.criticalRisks + stats.highRisks} high-priority risk item${stats.criticalRisks + stats.highRisks > 1 ? "s are" : " is"} currently active.`,
+        cta: "Open risk register",
+        href: `/app/projects/${projectId}/risk-register`,
+      };
+    }
+
+    if (stats.upcomingReviews > 0) {
+      return {
+        title: "Prepare scheduled review moments",
+        body: `${stats.upcomingReviews} scheduled review${stats.upcomingReviews > 1 ? "s are" : " is"} due in the next 14 days.`,
+        cta: "Plan review",
+        href: `/app/projects/${projectId}/risk-register`,
+      };
+    }
+
+    return {
+      title: "Project control looks stable",
+      body: "No urgent control gaps detected from current project data.",
+      cta: "Open timeline",
+      href: `/app/projects/${projectId}/project-timeline`,
+    };
+  }, [stats, projectId]);
 
   if (loading) {
     return (
       <div
         style={{
+          minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          height: "100%",
-          padding: 40,
+          background: "#f8fafc",
         }}
       >
         <Loader2
           style={{
-            height: 24,
             width: 24,
-            color: "#7c3aed",
+            height: 24,
+            color: "#4f46e5",
             animation: "spin 1s linear infinite",
           }}
         />
@@ -831,840 +839,481 @@ export default function ProjectDashboardPage() {
     );
   }
 
-  const scoreNum = parseFloat(stats.avgRiskScore);
-  const scoreColor = scoreNum >= 15 ? "#ef4444" : scoreNum >= 8 ? "#f59e0b" : "#22c55e";
-  const scoreLabel = scoreNum >= 15 ? "High" : scoreNum >= 8 ? "Medium" : "Low";
-
   return (
-    <div style={{ padding: "24px 24px 48px", background: "#f4f5fa", minHeight: "100%" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        padding: "10px 12px 24px 8px",
+      }}
+    >
       <div
         style={{
-          background: "linear-gradient(135deg, #1e2140 0%, #2d1f6e 50%, #1e2140 100%)",
-          borderRadius: 20,
-          padding: "28px 32px",
-          marginBottom: 20,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 20,
-          flexWrap: "wrap",
-          boxShadow: "0 8px 32px rgba(30,33,64,0.25)",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(255,255,255,0.12)",
-              borderRadius: 20,
-              padding: "4px 12px",
-              marginBottom: 12,
-            }}
-          >
-            <Shield style={{ height: 12, width: 12, color: "rgba(255,255,255,0.7)" }} />
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "rgba(255,255,255,0.7)",
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-              }}
-            >
-              Project Overview
-            </span>
-          </div>
-
-          <h1
-            style={{
-              fontSize: 36,
-              fontWeight: 800,
-              color: "white",
-              letterSpacing: "-0.03em",
-              marginBottom: 8,
-              lineHeight: 1.1,
-            }}
-          >
-            {project?.name || "Dashboard"}
-          </h1>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            {project?.client_name && (
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-                Client: <strong style={{ color: "white" }}>{project.client_name}</strong>
-              </span>
-            )}
-
-            {project?.project_value && (
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-                Value: <strong style={{ color: "#a78bfa" }}>{fmtEur(project.project_value)}</strong>
-              </span>
-            )}
-
-            {stats.daysLeft !== null && (
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>
-                Time left:{" "}
-                <strong style={{ color: "white" }}>
-                  {stats.daysLeft > 0 ? `${stats.daysLeft} days` : "Deadline passed"}
-                </strong>
-              </span>
-            )}
-          </div>
-
-          {project?.description && (
-            <p
-              style={{
-                marginTop: 14,
-                color: "rgba(255,255,255,0.72)",
-                fontSize: 14,
-                lineHeight: 1.6,
-                maxWidth: 760,
-              }}
-            >
-              {project.description}
-            </p>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <ScoreRing score={scoreNum} />
-          <button
-            onClick={() => loadDashboard(true)}
-            disabled={refreshing}
-            style={{
-              height: 42,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.08)",
-              color: "white",
-              padding: "0 14px",
-              fontSize: 13,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              cursor: "pointer",
-            }}
-          >
-            <RefreshCw
-              style={{
-                width: 15,
-                height: 15,
-                animation: refreshing ? "spin 1s linear infinite" : undefined,
-              }}
-            />
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-      </div>
-
-      {errorMessage && (
-        <div
-          style={{
-            marginBottom: 16,
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            borderRadius: 14,
-            padding: "12px 14px",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {errorMessage}
-        </div>
-      )}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.4fr 1fr",
-          gap: 14,
-          marginBottom: 18,
+          width: "100%",
+          maxWidth: "none",
+          margin: 0,
         }}
       >
         <div
           style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            background: "linear-gradient(135deg, #0f172a 0%, #111827 50%, #1e1b4b 100%)",
+            borderRadius: 24,
+            padding: 22,
+            marginBottom: 14,
           }}
         >
           <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.55fr) 320px",
+              gap: 18,
+              alignItems: "stretch",
+            }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div>
               <div
                 style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 10,
-                  background: "#f5f3ff",
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "center",
+                  gap: 8,
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.88)",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  marginBottom: 12,
                 }}
               >
-                <ShieldAlert style={{ width: 16, height: 16, color: "#7c3aed" }} />
+                Project Command Center
               </div>
-              <div>
-                <h2 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                  Project Insights
-                </h2>
-                <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>
-                  Automated control checks based on risks, actions, reviews and timeline status
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div style={{ display: "grid", gap: 12 }}>
-            {projectInsights.map((insight) => {
-              const tone = getInsightStyles(insight.severity);
-
-              return (
-                <div
-                  key={insight.id}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <h1
                   style={{
-                    border: `1px solid ${tone.border}`,
-                    background: tone.bg,
-                    borderRadius: 14,
-                    padding: 14,
+                    margin: 0,
+                    color: "white",
+                    fontSize: 38,
+                    lineHeight: 1.02,
+                    fontWeight: 900,
+                    letterSpacing: "-0.03em",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <div
-                        style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: 10,
-                          background: tone.iconBg,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Zap style={{ width: 15, height: 15, color: tone.iconColor }} />
-                      </div>
+                  {project?.name ?? "Project Overview"}
+                </h1>
 
-                      <div>
-                        <p style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                          {insight.title}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: 12,
-                            color: "#475569",
-                            margin: "5px 0 0",
-                            lineHeight: 1.45,
-                          }}
-                        >
-                          {insight.description}
-                        </p>
+                <span
+                  style={{
+                    padding: "7px 11px",
+                    borderRadius: 12,
+                    background: "rgba(99,102,241,0.24)",
+                    color: "#c7d2fe",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {project?.project_phase ?? project?.status ?? "Active"}
+                </span>
+              </div>
 
-                        {insight.href && insight.ctaLabel ? (
-                          <Link
-                            href={insight.href}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                              marginTop: 8,
-                              color: "#6d28d9",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              textDecoration: "none",
-                            }}
-                          >
-                            {insight.ctaLabel}
-                            <ArrowRight style={{ width: 13, height: 13 }} />
-                          </Link>
-                        ) : null}
-                      </div>
-                    </div>
+              <div
+                style={{
+                  marginTop: 10,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 14,
+                  color: "rgba(255,255,255,0.74)",
+                  fontSize: 12,
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Building2 style={{ width: 12, height: 12 }} />
+                  {project?.client_name ?? "Unknown client"}
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <MapPin style={{ width: 12, height: 12 }} />
+                  {project?.city ?? project?.region ?? "Unknown location"}
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Briefcase style={{ width: 12, height: 12 }} />
+                  {project?.project_type ?? "Project"}
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <CalendarDays style={{ width: 12, height: 12 }} />
+                  {fmtDate(project?.start_date)} — {fmtDate(project?.end_date)}
+                </span>
+              </div>
 
-                    {insight.stat ? (
-                      <div
-                        style={{
-                          padding: "5px 8px",
-                          borderRadius: 999,
-                          background: tone.pillBg,
-                          color: tone.pillColor,
-                          fontSize: 11,
-                          fontWeight: 800,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {insight.stat}
-                      </div>
-                    ) : null}
-                  </div>
+              <div
+                style={{
+                  marginTop: 18,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <StatsCard
+                  title="Project value"
+                  value={compactMoney(project?.project_value)}
+                  subtitle={project?.contract_type ?? "Contract"}
+                />
+                <StatsCard
+                  title="Critical attention"
+                  value={stats.criticalRisks + stats.overdueActions}
+                  subtitle={`${stats.criticalRisks} critical risks · ${stats.overdueActions} overdue actions`}
+                />
+                <StatsCard
+                  title="Open controls"
+                  value={stats.openActions}
+                  subtitle={`${stats.upcomingReviews} reviews due soon`}
+                />
+                <StatsCard
+                  title="Stakeholders"
+                  value={stats.totalStakeholders}
+                  subtitle="Linked stakeholders"
+                />
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 20,
+                padding: 16,
+                color: "white",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.66)", fontWeight: 700 }}>
+                  Project health
                 </div>
-              );
-            })}
+                <div style={{ marginTop: 8, fontSize: 34, fontWeight: 900 }}>
+                  {stats.avgScore.toFixed(1)}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.72)" }}>
+                  Average project risk score
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 14,
+                  padding: 14,
+                  borderRadius: 16,
+                  background: "rgba(15,23,42,0.26)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.68)", fontWeight: 700 }}>
+                  Primary recommendation
+                </div>
+                <div style={{ marginTop: 8, fontSize: 20, lineHeight: 1.15, fontWeight: 800 }}>
+                  {mainInsight.title}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55, color: "rgba(255,255,255,0.76)" }}>
+                  {mainInsight.body}
+                </div>
+
+                <Link
+                  href={mainInsight.href}
+                  style={{
+                    marginTop: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "white",
+                    color: "#111827",
+                    textDecoration: "none",
+                    padding: "9px 12px",
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  {mainInsight.cta}
+                  <ArrowRight style={{ width: 14, height: 14 }} />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
 
         <div
           style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 12,
+            marginBottom: 14,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: "#eff6ff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <TrendingUp style={{ width: 16, height: 16, color: "#2563eb" }} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                Recommended next step
-              </h2>
-              <p style={{ fontSize: 12, color: "#64748b", margin: "2px 0 0" }}>
-                Focus the team on the biggest control gap first
-              </p>
-            </div>
-          </div>
-
           <div
             style={{
-              borderRadius: 14,
-              background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
-              border: "1px solid #dbeafe",
+              background: "#f5f3ff",
+              border: "1px solid #ddd6fe",
+              borderRadius: 18,
               padding: 16,
             }}
           >
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: "#1d4ed8",
-                margin: 0,
-                marginBottom: 8,
-              }}
-            >
-              Suggested action
-            </p>
-            <p style={{ fontSize: 13, lineHeight: 1.55, color: "#334155", margin: 0 }}>
-              {projectInsights[0]?.severity === "critical"
-                ? "Resolve the top critical issue first before adding new mitigation tasks."
-                : projectInsights[0]?.severity === "warning"
-                ? "Clear the current warning items to stabilize project controls."
-                : "Project health is stable. Keep reviews and action ownership up to date."}
-            </p>
-          </div>
-
-          <div
-            style={{
-              marginTop: 14,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-            }}
-          >
-            <Link
-              href={`/app/projects/${projectId}/risk-register`}
-              style={{
-                borderRadius: 12,
-                background: "#7c3aed",
-                color: "white",
-                textDecoration: "none",
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "11px 12px",
-                textAlign: "center",
-              }}
-            >
-              Open risk register
-            </Link>
-
-            <Link
-              href={`/app/projects/${projectId}/actions`}
-              style={{
-                borderRadius: 12,
-                background: "#f8fafc",
-                color: "#334155",
-                textDecoration: "none",
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "11px 12px",
-                textAlign: "center",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              Review actions
-            </Link>
-          </div>
-
-          <div
-            style={{
-              marginTop: 16,
-              borderTop: "1px solid #f1f5f9",
-              paddingTop: 14,
-              display: "grid",
-              gap: 10,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, color: "#64748b" }}>Average risk score</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: scoreColor }}>
-                {stats.avgRiskScore} · {scoreLabel}
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, color: "#64748b" }}>Stakeholders linked</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
-                {stats.totalStakeholders}
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, color: "#64748b" }}>Upcoming reviews</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>
-                {stats.upcomingReviews}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-          gap: 12,
-          marginBottom: 18,
-        }}
-      >
-        <StatCard
-          icon={<AlertTriangle style={{ width: 18, height: 18 }} />}
-          title="Total Risks"
-          value={stats.totalRisks}
-          subtext={`${stats.highRisks} high · ${stats.mediumRisks} medium · ${stats.lowRisks} low`}
-          iconBg="#fef2f2"
-          iconColor="#ef4444"
-        />
-        <StatCard
-          icon={<ClipboardList style={{ width: 18, height: 18 }} />}
-          title="Open Actions"
-          value={stats.openActions}
-          subtext={`${stats.completedActions} completed`}
-          iconBg="#eff6ff"
-          iconColor="#2563eb"
-        />
-        <StatCard
-          icon={<Clock style={{ width: 18, height: 18 }} />}
-          title="Overdue Actions"
-          value={stats.overdueActions}
-          subtext="Immediate follow-up needed"
-          iconBg="#fff7ed"
-          iconColor="#d97706"
-        />
-        <StatCard
-          icon={<Users style={{ width: 18, height: 18 }} />}
-          title="Stakeholders"
-          value={stats.totalStakeholders}
-          subtext="Assigned to this project"
-          iconBg="#f0fdf4"
-          iconColor="#16a34a"
-        />
-        <StatCard
-          icon={<Bell style={{ width: 18, height: 18 }} />}
-          title="Unread Alerts"
-          value={stats.unreadNotifications}
-          subtext={`${stats.upcomingReviews} reviews due soon`}
-          iconBg="#f5f3ff"
-          iconColor="#7c3aed"
-        />
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.2fr 0.9fr 0.9fr",
-          gap: 14,
-          marginBottom: 18,
-        }}
-      >
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
-          >
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Top Risks</h3>
-              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                Highest scoring items in the register
-              </p>
-            </div>
-            <Link
-              href={`/app/projects/${projectId}/risk-register`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                fontSize: 12,
-                color: "#7c3aed",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              View all <ArrowRight style={{ height: 11, width: 11 }} />
-            </Link>
-          </div>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            {topRisks.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>
-                No risks added yet
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                  Risk reviews due soon
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55, color: "#475569" }}>
+                  {stats.upcomingReviews > 0
+                    ? `${stats.upcomingReviews} scheduled review${stats.upcomingReviews > 1 ? "s should" : " should"} be completed in the next 14 days.`
+                    : "No risk reviews due in the next 14 days."}
+                </div>
+                <Link
+                  href={`/app/projects/${projectId}/risk-register`}
+                  style={{
+                    marginTop: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    textDecoration: "none",
+                    color: "#111827",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  Plan review
+                  <ArrowRight style={{ width: 14, height: 14 }} />
+                </Link>
               </div>
-            ) : (
-              topRisks.map((risk) => {
-                const levelColor =
-                  risk.level === "high"
-                    ? "#ef4444"
-                    : risk.level === "medium"
-                    ? "#f59e0b"
-                    : "#22c55e";
 
-                return (
-                  <div
-                    key={risk.id}
-                    style={{
-                      border: "1px solid #f1f5f9",
-                      borderRadius: 12,
-                      padding: 12,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "#0f172a",
-                          margin: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {risk.title}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5, flexWrap: "wrap" }}>
-                        {risk.category && (
-                          <span style={{ fontSize: 11, color: "#64748b" }}>{risk.category}</span>
-                        )}
-                        {risk.phase && (
-                          <span style={{ fontSize: 11, color: "#94a3b8" }}>{risk.phase}</span>
-                        )}
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                          Review: {risk.due_review_date ? timeAgo(risk.due_review_date) : "not set"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div
-                        style={{
-                          borderRadius: 999,
-                          background: `${levelColor}15`,
-                          color: levelColor,
-                          fontSize: 11,
-                          fontWeight: 800,
-                          padding: "5px 8px",
-                        }}
-                      >
-                        {risk.score} · {risk.level}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
-          >
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Risk Matrix</h3>
-              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                Probability × impact overview
-              </p>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#4f46e5",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {stats.upcomingReviews} due
+              </div>
             </div>
-            <Target style={{ width: 15, height: 15, color: "#94a3b8" }} />
           </div>
-
-          <RiskMatrix risks={risks} />
 
           <div
             style={{
-              marginTop: 14,
-              borderTop: "1px solid #f1f5f9",
-              paddingTop: 12,
-              display: "grid",
-              gap: 8,
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              borderRadius: 18,
+              padding: 16,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "#64748b" }}>Average score</span>
-              <span style={{ fontWeight: 800, color: scoreColor }}>{stats.avgRiskScore}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: "#64748b" }}>Overall exposure</span>
-              <span style={{ fontWeight: 800, color: scoreColor }}>{scoreLabel}</span>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
-          >
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Urgent Actions</h3>
-              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                Overdue or high-priority actions
-              </p>
-            </div>
-            <Link
-              href={`/app/projects/${projectId}/actions`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                fontSize: 12,
-                color: "#7c3aed",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              View all <ArrowRight style={{ height: 11, width: 11 }} />
-            </Link>
-          </div>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            {urgentActions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>
-                No urgent actions
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                  Stakeholder readiness
+                </div>
+                <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55, color: "#475569" }}>
+                  {stats.totalStakeholders === 0
+                    ? "There are active risks and actions, but no stakeholders are linked yet."
+                    : `${stats.totalStakeholders} stakeholder${stats.totalStakeholders > 1 ? "s are" : " is"} linked to this project.`}
+                </div>
+                <Link
+                  href={`/app/projects/${projectId}/stakeholders`}
+                  style={{
+                    marginTop: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    textDecoration: "none",
+                    color: "#111827",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                >
+                  Open stakeholders
+                  <ArrowRight style={{ width: 14, height: 14 }} />
+                </Link>
               </div>
-            ) : (
-              urgentActions.map((action) => {
-                const overdue = action.due_date && action.status !== "done" && isOverdue(action.due_date);
 
-                return (
-                  <div
-                    key={action.id}
-                    style={{
-                      border: "1px solid #f1f5f9",
-                      borderRadius: 12,
-                      padding: 12,
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: "#0f172a",
-                        margin: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {action.title}
-                    </p>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          borderRadius: 999,
-                          padding: "4px 8px",
-                          background:
-                            action.priority === "critical"
-                              ? "#fef2f2"
-                              : action.priority === "high"
-                              ? "#fff7ed"
-                              : "#f8fafc",
-                          color:
-                            action.priority === "critical"
-                              ? "#dc2626"
-                              : action.priority === "high"
-                              ? "#d97706"
-                              : "#475569",
-                        }}
-                      >
-                        {action.priority}
-                      </span>
-
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          borderRadius: 999,
-                          padding: "4px 8px",
-                          background:
-                            action.status === "done"
-                              ? "#f0fdf4"
-                              : action.status === "blocked"
-                              ? "#fef2f2"
-                              : "#eff6ff",
-                          color:
-                            action.status === "done"
-                              ? "#16a34a"
-                              : action.status === "blocked"
-                              ? "#dc2626"
-                              : "#2563eb",
-                        }}
-                      >
-                        {action.status}
-                      </span>
-
-                      {overdue && (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 800,
-                            borderRadius: 999,
-                            padding: "4px 8px",
-                            background: "#fef2f2",
-                            color: "#dc2626",
-                          }}
-                        >
-                          overdue
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#d97706",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {stats.totalStakeholders} linked
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 14,
-          marginBottom: 18,
-        }}
-      >
         <div
           style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)",
+            gap: 14,
+            marginBottom: 14,
           }}
         >
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
+          <Section
+            title="Project phase & schedule pressure"
+            subtitle="Compact planning overview with phase progress and risk pressure"
+            right={
+              <Link
+                href={`/app/projects/${projectId}/project-timeline`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  textDecoration: "none",
+                  color: "#111827",
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                Open full timeline
+                <ArrowRight style={{ width: 14, height: 14 }} />
+              </Link>
+            }
           >
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Risk Categories</h3>
-              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                Distribution of current risk register
-              </p>
-            </div>
-            <TrendingUp style={{ width: 15, height: 15, color: "#94a3b8" }} />
-          </div>
+            <CompactTimeline project={project} timeline={timeline} risks={risks} />
+          </Section>
 
-          {categoryDist.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>
-              No categories yet
+          <Section title="Risk exposure summary" subtitle="Current project posture">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: 14,
+                  background: "#eef2ff",
+                  border: "1px solid #c7d2fe",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4f46e5" }}>Current phase</div>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                  {project?.project_phase ?? project?.status ?? "Active"}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                  {stats.daysLeft !== null
+                    ? `${stats.daysLeft} days remaining until scheduled end`
+                    : "No end date configured"}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: 14,
+                  background: "#fff7ed",
+                  border: "1px solid #fdba74",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#ea580c" }}>Control load</div>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                  {stats.openActions + stats.upcomingReviews}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                  Open actions and due reviews requiring follow-up
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: 14,
+                  background: "#fef2f2",
+                  border: "1px solid #fecaca",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>
+                  Risk concentration
+                </div>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                  {stats.criticalRisks + stats.highRisks}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                  High and critical risks currently visible
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 14,
+                  padding: 14,
+                  background: "#f0fdf4",
+                  border: "1px solid #86efac",
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a" }}>Planning window</div>
+                <div style={{ marginTop: 8, fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                  {project?.start_date && project?.end_date
+                    ? Math.ceil(
+                        (new Date(project.end_date).getTime() - new Date(project.start_date).getTime()) /
+                          86400000
+                      )
+                    : "—"}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+                  Total scheduled project days
+                </div>
+              </div>
             </div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              {categoryDist.map((item, idx) => {
-                const pct = stats.totalRisks > 0 ? (item.count / stats.totalRisks) * 100 : 0;
-                const color = ["#7c3aed", "#3b82f6", "#22c55e", "#f59e0b", "#ef4444"][idx % 5];
+
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 11,
+                  color: "#64748b",
+                  fontWeight: 700,
+                  marginBottom: 8,
+                }}
+              >
+                <span>Risk distribution</span>
+                <span>{stats.totalRisks} total risks</span>
+              </div>
+
+              {[
+                { label: "Critical", count: stats.criticalRisks, color: "#ef4444" },
+                { label: "High", count: stats.highRisks, color: "#f97316" },
+                { label: "Medium", count: stats.mediumRisks, color: "#eab308" },
+                { label: "Low", count: stats.lowRisks, color: "#22c55e" },
+              ].map((item) => {
+                const pct = stats.totalRisks > 0 ? Math.round((item.count / stats.totalRisks) * 100) : 0;
 
                 return (
-                  <div key={item.label}>
+                  <div key={item.label} style={{ marginBottom: 8 }}>
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "center",
                         justifyContent: "space-between",
-                        marginBottom: 6,
+                        fontSize: 11,
+                        marginBottom: 5,
+                        color: "#475569",
+                        fontWeight: 700,
                       }}
                     >
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
-                        {item.label}
+                      <span>{item.label}</span>
+                      <span>
+                        {item.count} · {pct}%
                       </span>
-                      <span style={{ fontSize: 12, color: "#64748b" }}>{item.count}</span>
                     </div>
                     <div
                       style={{
                         height: 8,
-                        background: "#f1f5f9",
                         borderRadius: 999,
+                        background: "#f1f5f9",
                         overflow: "hidden",
                       }}
                     >
                       <div
                         style={{
-                          width: `${pct}%`,
                           height: "100%",
-                          background: color,
+                          width: `${pct}%`,
+                          background: item.color,
                           borderRadius: 999,
                         }}
                       />
@@ -1673,143 +1322,425 @@ export default function ProjectDashboardPage() {
                 );
               })}
             </div>
-          )}
+          </Section>
         </div>
 
         <div
           style={{
-            background: "white",
-            border: "1px solid #e8eaf0",
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(0, 0.95fr)",
+            gap: 14,
+            marginBottom: 14,
           }}
         >
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
-          >
-            <div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Project Timeline</h3>
-              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                Milestones and review moments
-              </p>
-            </div>
-            <Link
-              href={`/app/projects/${projectId}/project-timeline`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                fontSize: 12,
-                color: "#7c3aed",
-                textDecoration: "none",
-                fontWeight: 600,
-              }}
-            >
-              Open timeline <ArrowRight style={{ height: 11, width: 11 }} />
-            </Link>
-          </div>
-
-          <MiniGantt events={timeline} />
-        </div>
-      </div>
-
-      <div
-        style={{
-          background: "white",
-          border: "1px solid #e8eaf0",
-          borderRadius: 16,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            padding: "18px 18px 12px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #f8fafc",
-          }}
-        >
-          <div>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Recent Activity</h3>
-            <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>Latest project alerts</p>
-          </div>
-          <Link
-            href={`/app/projects/${projectId}/notifications`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              fontSize: 12,
-              color: "#7c3aed",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
-          >
-            View all <ArrowRight style={{ height: 11, width: 11 }} />
-          </Link>
-        </div>
-
-        <div style={{ padding: "6px 0" }}>
-          {notifications.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 13 }}>
-              No notifications yet
-            </div>
-          ) : (
-            notifications.slice(0, 6).map((n, i) => (
-              <div
-                key={n.id}
+          <Section
+            title="Top risks"
+            subtitle="Highest priority project risks"
+            right={
+              <Link
+                href={`/app/projects/${projectId}/risk-register`}
                 style={{
-                  display: "flex",
-                  gap: 12,
-                  padding: "9px 18px",
-                  borderBottom: i < Math.min(notifications.length, 6) - 1 ? "1px solid #f8fafc" : "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  textDecoration: "none",
+                  color: "#111827",
+                  fontSize: 12,
+                  fontWeight: 800,
                 }}
               >
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: n.is_read ? "#e2e8f0" : "#7c3aed",
-                    flexShrink: 0,
-                    marginTop: 4,
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      fontWeight: n.is_read ? 400 : 600,
-                      color: n.is_read ? "#64748b" : "#1e293b",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {n.title}
-                  </p>
-                  {n.body && (
-                    <p
+                Open register
+                <ArrowRight style={{ width: 14, height: 14 }} />
+              </Link>
+            }
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {topRisks.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#64748b" }}>No risks found yet.</div>
+              ) : (
+                topRisks.map((risk) => {
+                  const level = normalizeLevel(risk.level, risk.score);
+                  const s = levelStyle(level);
+
+                  return (
+                    <div
+                      key={risk.id}
                       style={{
-                        fontSize: 11,
-                        color: "#94a3b8",
-                        marginTop: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        background: s.bg,
+                        border: `1px solid ${s.border}`,
+                        borderRadius: 14,
+                        padding: 12,
                       }}
                     >
-                      {n.body}
-                    </p>
-                  )}
-                  <p style={{ fontSize: 10, color: "#cbd5e1", marginTop: 2 }}>{timeAgo(n.created_at)}</p>
-                </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                background: s.dot,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 800,
+                                color: "#111827",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {risk.title}
+                            </div>
+                            <span
+                              style={{
+                                padding: "4px 8px",
+                                borderRadius: 999,
+                                background: "rgba(255,255,255,0.65)",
+                                color: s.text,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {level}
+                            </span>
+                          </div>
+
+                          <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.55, color: "#475569" }}>
+                            {risk.description || risk.suggested_action || "No description available."}
+                          </div>
+
+                          <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap", fontSize: 10, color: "#64748b" }}>
+                            <span>Score: <strong style={{ color: "#111827" }}>{risk.score ?? "—"}</strong></span>
+                            <span>Phase: <strong style={{ color: "#111827" }}>{risk.phase ?? "—"}</strong></span>
+                            <span>Review: <strong style={{ color: "#111827" }}>{fmtDate(risk.due_review_date)}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Section>
+
+          <Section
+            title="Urgent actions"
+            subtitle="Immediate follow-up items"
+            right={
+              <Link
+                href={`/app/projects/${projectId}/actions`}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  textDecoration: "none",
+                  color: "#111827",
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              >
+                Open actions
+                <ArrowRight style={{ width: 14, height: 14 }} />
+              </Link>
+            }
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {urgentActions.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#64748b" }}>No urgent actions found.</div>
+              ) : (
+                urgentActions.map((action) => {
+                  const blocked = (action.status ?? "").toLowerCase() === "blocked";
+                  const overdue = (action.status ?? "").toLowerCase() !== "done" && isOverdue(action.due_date);
+                  const bg = blocked ? "#fef2f2" : overdue ? "#fff7ed" : "#f8fafc";
+                  const border = blocked ? "#fecaca" : overdue ? "#fdba74" : "#e5e7eb";
+                  const color = blocked ? "#dc2626" : overdue ? "#ea580c" : "#475569";
+
+                  return (
+                    <div
+                      key={action.id}
+                      style={{
+                        background: bg,
+                        border: `1px solid ${border}`,
+                        borderRadius: 14,
+                        padding: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>
+                            {action.title}
+                          </div>
+                          <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.55, color: "#475569" }}>
+                            {action.description || "Mitigation action requires follow-up."}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 999,
+                            background: "rgba(255,255,255,0.72)",
+                            color,
+                            fontSize: 10,
+                            fontWeight: 800,
+                            height: "fit-content",
+                            whiteSpace: "nowrap",
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {blocked ? "Blocked" : overdue ? "Overdue" : action.status ?? "Open"}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 8,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 10,
+                          color: "#64748b",
+                        }}
+                      >
+                        <span>Due date</span>
+                        <span style={{ color, fontWeight: 800 }}>{fmtDate(action.due_date)}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Section>
+
+          <Section
+            title="Risk matrix"
+            subtitle="Probability × impact"
+            right={
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+                {stats.totalRisks} mapped
               </div>
-            ))
-          )}
+            }
+          >
+            <RiskMatrix risks={risks} />
+          </Section>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
+            gap: 14,
+          }}
+        >
+          <Section title="Category distribution" subtitle="Risk clustering by category">
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {categoryDistribution.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#64748b" }}>No category data available.</div>
+              ) : (
+                categoryDistribution.map((item, idx) => {
+                  const pct = stats.totalRisks > 0 ? Math.round((item.count / stats.totalRisks) * 100) : 0;
+                  const colors = ["#4f46e5", "#8b5cf6", "#f97316", "#eab308", "#22c55e"];
+                  const color = colors[idx % colors.length];
+
+                  return (
+                    <div key={item.label}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#334155",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span>{item.label}</span>
+                        <span>
+                          {item.count} · {pct}%
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          height: 8,
+                          borderRadius: 999,
+                          background: "#f1f5f9",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${pct}%`,
+                            borderRadius: 999,
+                            background: color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Section>
+
+          <Section title="Recent activity" subtitle="Latest project updates">
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {recentActivity.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#64748b" }}>No recent activity found.</div>
+              ) : (
+                recentActivity.map((item) => {
+                  const icon =
+                    item.type === "notification" ? (
+                      <Bell style={{ width: 14, height: 14 }} />
+                    ) : item.type === "action" ? (
+                      <Wrench style={{ width: 14, height: 14 }} />
+                    ) : (
+                      <FileWarning style={{ width: 14, height: 14 }} />
+                    );
+
+                  const color =
+                    item.type === "notification" ? "#4f46e5" : item.type === "action" ? "#ea580c" : "#dc2626";
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "flex-start",
+                        border: "1px solid #eef2f7",
+                        borderRadius: 14,
+                        padding: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 10,
+                          background: `${color}15`,
+                          color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {icon}
+                      </div>
+
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "#111827" }}>
+                          {item.title}
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>
+                          {item.subtitle}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "#94a3b8",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {timeAgo(item.at)}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Section>
+
+          <Section title="Project context" subtitle="Core project metadata">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[
+                ["Project code", project?.project_code ?? "—"],
+                ["Client", project?.client_name ?? "—"],
+                ["Contract type", project?.contract_type ?? "—"],
+                ["Project value", formatMoney(project?.project_value)],
+                ["Start date", fmtDate(project?.start_date)],
+                ["End date", fmtDate(project?.end_date)],
+                ["Site type", project?.site_type ?? "—"],
+                ["Permit required", project?.permit_required ? "Yes" : "No"],
+                ["Main contractor", project?.main_contractor ?? "—"],
+                ["Intake method", project?.intake_method ?? "—"],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  style={{
+                    border: "1px solid #eef2f7",
+                    borderRadius: 12,
+                    padding: 10,
+                    background: "#fbfdff",
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>{label}</div>
+                  <div style={{ marginTop: 6, fontSize: 13, fontWeight: 800, color: "#111827" }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {(project?.description || project?.planning_notes || project?.critical_dependencies) && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                {project?.description && (
+                  <div
+                    style={{
+                      border: "1px solid #eef2f7",
+                      borderRadius: 12,
+                      padding: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>Description</div>
+                    <div style={{ marginTop: 6, fontSize: 11, color: "#475569", lineHeight: 1.55 }}>
+                      {project.description}
+                    </div>
+                  </div>
+                )}
+
+                {project?.planning_notes && (
+                  <div
+                    style={{
+                      border: "1px solid #eef2f7",
+                      borderRadius: 12,
+                      padding: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>Planning notes</div>
+                    <div style={{ marginTop: 6, fontSize: 11, color: "#475569", lineHeight: 1.55 }}>
+                      {project.planning_notes}
+                    </div>
+                  </div>
+                )}
+
+                {project?.critical_dependencies && (
+                  <div
+                    style={{
+                      border: "1px solid #eef2f7",
+                      borderRadius: 12,
+                      padding: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>Critical dependencies</div>
+                    <div style={{ marginTop: 6, fontSize: 11, color: "#475569", lineHeight: 1.55 }}>
+                      {project.critical_dependencies}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Section>
         </div>
       </div>
     </div>

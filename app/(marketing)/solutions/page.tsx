@@ -1,272 +1,265 @@
-import Link from "next/link";
+"use client";
+
+import { useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { motion, useInView } from "framer-motion";
+import { ArrowRight, Check } from "lucide-react";
 
-const steps = [
+type SolutionItem = {
+  slug: string;
+  title: string;
+  description: string;
+  body: string;
+  image: string;
+  imageAlt: string;
+  imageSide: "left" | "right";
+  bullets: string[];
+};
+
+const solutions: SolutionItem[] = [
   {
-    number: "01",
-    title: "Create a workspace",
-    text: "Set up your workspace and invite your team in minutes.",
+    slug: "construction",
+    title: "Construction",
+    description: "Mitigate construction project risks with more clarity and control.",
+    body:
+      "Centralize project risk oversight across site operations, contractors and delivery milestones. Keep teams aligned on safety, compliance and execution without relying on fragmented spreadsheets.",
+    image: "/construction.jpg",
+    imageAlt: "Construction industry solution",
+    imageSide: "left",
+    bullets: [
+      "Monitor site safety protocols and project compliance",
+      "Assess contractor and subcontractor risk profiles",
+      "Track delays, issues and on-site hazards in one workflow",
+    ],
   },
   {
-    number: "02",
-    title: "Add and score risks",
-    text: "Structure risks clearly and apply one consistent scoring model.",
+    slug: "infrastructure",
+    title: "Infrastructure",
+    description: "Streamline infrastructure risk management across complex public works.",
+    body:
+      "Navigate large-scale infrastructure delivery with structured oversight, early warning indicators and standardized reporting. Reduce surprises and improve accountability across teams and suppliers.",
+    image: "/infrastructure.jpg",
+    imageAlt: "Infrastructure industry solution",
+    imageSide: "right",
+    bullets: [
+      "Monitor infrastructure risk dashboards centrally",
+      "Set early warnings for critical milestones and exposures",
+      "Assess contractor, supplier and dependency risks",
+    ],
   },
   {
-    number: "03",
-    title: "Assign actions",
-    text: "Turn risks into clear ownership, deadlines and follow-up.",
+    slug: "maritime",
+    title: "Maritime & Offshore",
+    description: "Manage risks across maritime, offshore and port operations.",
+    body:
+      "Maintain stronger oversight of operational, regulatory and supply chain risks across vessels, terminals and offshore environments. Give teams one structured system for identification, ownership and review.",
+    image: "/maritime.png",
+    imageAlt: "Maritime and offshore solution",
+    imageSide: "left",
+    bullets: [
+      "Monitor vessels and offshore operations in real time",
+      "Improve compliance with maritime regulations",
+      "Strengthen resilience across offshore supply chains",
+    ],
   },
   {
-    number: "04",
-    title: "Report and improve",
-    text: "Track progress and generate updates for every stakeholder.",
+    slug: "event-management",
+    title: "Event Management",
+    description: "Keep event execution controlled across planning, vendors and operations.",
+    body:
+      "Coordinate venues, suppliers, health and safety considerations and operational dependencies in one place. Reduce execution risk and improve clarity from preparation to live event delivery.",
+    image: "/event.jpg",
+    imageAlt: "Event management solution",
+    imageSide: "right",
+    bullets: [
+      "Track vendor, venue and operational risks clearly",
+      "Improve incident readiness and live event coordination",
+      "Keep planning, ownership and mitigation in one workflow",
+    ],
   },
 ];
 
-const sections = [
-  {
-    id: "construction",
-    eyebrow: "Built for real project environments",
-    label: "Construction",
-    title: "Created for teams that need clarity on site and in the office.",
-    text: "RiskBases helps construction teams structure project risks, assign actions, monitor safety-related issues, and improve follow-up across every phase of delivery.",
-    bullets: [
-      "Project-based risk registers",
-      "Clear ownership and deadlines",
-      "Structured safety and compliance workflows",
-      "Cleaner reporting for internal and external stakeholders",
-    ],
-    image: "/solutions-construction.jpg",
-    alt: "Construction team on site",
-    background: "bg-[#f3f4f7]",
-    reverse: false,
-  },
-  {
-    id: "infrastructure",
-    eyebrow: "Designed for complex delivery",
-    label: "Infrastructure",
-    title: "Built for infrastructure teams managing many stakeholders and long timelines.",
-    text: "Bring programs, phases, and project governance together in one consistent workflow designed for infrastructure environments.",
-    bullets: [
-      "Multi-stakeholder alignment",
-      "Phase-based risk monitoring",
-      "Program and project visibility",
-      "Better governance and review structure",
-    ],
-    image: "/solutions-infrastructure.jpg",
-    alt: "Infrastructure project environment",
-    background: "bg-white",
-    reverse: true,
-  },
-  {
-    id: "maritime",
-    eyebrow: "Operational visibility where it matters most",
-    label: "Maritime & Offshore",
-    title: "Structured risk management for operational and offshore environments.",
-    text: "Track operational, technical, and compliance-related risks with a workflow that supports offshore and maritime teams.",
-    bullets: [
-      "Operational risk tracking",
-      "Incident and action follow-up",
-      "Audit-ready structure",
-      "Centralized project records",
-    ],
-    image: "/solutions-maritime.jpg",
-    alt: "Maritime and offshore operations",
-    background: "bg-[#f3f4f7]",
-    reverse: false,
-  },
-  {
-    id: "enterprise",
-    eyebrow: "One standard across the business",
-    label: "Enterprise Teams",
-    title: "Made for organizations that want consistency across teams and departments.",
-    text: "Standardize workflows, improve reporting quality, and give leadership more visibility with one scalable setup for risk management.",
-    bullets: [
-      "Shared templates and workflows",
-      "Role-based collaboration",
-      "Executive reporting visibility",
-      "Scalable governance across teams",
-    ],
-    image: "/solutions-enterprise.jpg",
-    alt: "Enterprise teams collaborating",
-    background: "bg-white",
-    reverse: true,
-  },
-];
+function Reveal({
+  children,
+  direction = "up",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  direction?: "left" | "right" | "up";
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+
+  const hiddenX = direction === "left" ? -48 : direction === "right" ? 48 : 0;
+  const hiddenY = direction === "up" ? 32 : 0;
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, x: hiddenX, y: hiddenY }}
+      animate={
+        isInView
+          ? { opacity: 1, x: 0, y: 0 }
+          : { opacity: 0, x: hiddenX, y: hiddenY }
+      }
+      transition={{
+        duration: 0.7,
+        ease: "easeOut",
+        delay,
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function SolutionCard({ item, index }: { item: SolutionItem; index: number }) {
+  const imageBlock = (
+    <div className="relative min-h-[320px] overflow-hidden bg-[#e9edf1] md:min-h-[420px]">
+      <Image
+        src={item.image}
+        alt={item.imageAlt}
+        fill
+        className="object-cover object-center"
+        priority={index === 0}
+      />
+    </div>
+  );
+
+  const textBlock = (
+    <div className="flex h-full flex-col justify-center p-8 md:p-10 lg:p-12">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-black/55">
+        Solution
+      </p>
+
+      <h2 className="mt-3 text-[34px] font-semibold leading-[1.02] tracking-[-0.04em] text-black md:text-[44px]">
+        {item.title}
+      </h2>
+
+      <p className="mt-5 text-[20px] leading-8 text-black">
+        {item.description}
+      </p>
+
+      <p className="mt-5 max-w-[620px] text-[17px] leading-8 text-black">
+        {item.body}
+      </p>
+
+      <div className="mt-7 space-y-4">
+        {item.bullets.map((bullet) => (
+          <div key={bullet} className="flex items-start gap-3">
+            <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#eef7ee]">
+              <Check className="h-3.5 w-3.5 text-[#4b9b4b]" />
+            </div>
+            <p className="text-[16px] leading-7 text-black">{bullet}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8">
+        <Link
+          href={`/solutions#${item.slug}`}
+          className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          Explore {item.title}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+
+  return (
+    <Reveal
+      direction={item.imageSide === "left" ? "left" : "right"}
+      delay={index * 0.05}
+    >
+      <section
+        id={item.slug}
+        className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
+      >
+        <div
+          className={`grid min-h-[420px] lg:grid-cols-2 ${
+            item.imageSide === "right" ? "lg:[&>*:first-child]:order-1 lg:[&>*:last-child]:order-2" : ""
+          }`}
+        >
+          {item.imageSide === "left" ? (
+            <>
+              {imageBlock}
+              {textBlock}
+            </>
+          ) : (
+            <>
+              {textBlock}
+              {imageBlock}
+            </>
+          )}
+        </div>
+      </section>
+    </Reveal>
+  );
+}
 
 export default function SolutionsPage() {
   return (
-    <main className="bg-white text-black">
-      <section className="border-b border-neutral-200 bg-[#f5f5f7]">
-        <div className="mx-auto max-w-[1180px] px-6 py-24 sm:px-8 lg:px-10 lg:py-32">
-          <div className="max-w-[780px]">
-            <p className="text-sm font-semibold text-neutral-900">Solutions</p>
-
-            <h1 className="mt-5 text-[56px] font-bold leading-[0.95] tracking-[-0.06em] sm:text-[72px] lg:text-[88px]">
-              Risk management
-              <br />
-              for real project
-              <br />
-              environments.
-            </h1>
-
-            <p className="mt-8 max-w-[640px] text-lg leading-8 text-neutral-600 sm:text-xl">
-              One platform for construction, infrastructure, maritime &
-              offshore, and enterprise teams — designed to bring more structure,
-              accountability, and visibility to risk.
+    <main className="min-h-screen bg-[#f3f4f6] text-black">
+      <section className="mx-auto max-w-[1280px] px-6 pb-24 pt-16 md:px-8 md:pt-20">
+        <div className="mx-auto max-w-[1080px]">
+          <Reveal>
+            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-black">
+              Solutions
             </p>
+          </Reveal>
 
-            <div className="mt-10 flex flex-wrap gap-4">
-              <Link
-                href="/book-demo"
-                className="rounded-full bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-              >
-                Book a demo
-              </Link>
+          <Reveal delay={0.04}>
+            <h1 className="max-w-[760px] text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-black md:text-[68px]">
+              Risk management adapted
+              <span className="text-black/35"> to your industry.</span>
+            </h1>
+          </Reveal>
 
-              <Link
+          <Reveal delay={0.08}>
+            <p className="mt-6 max-w-[840px] text-[20px] leading-9 text-black">
+              RiskBases adapts to your environment. From construction and
+              infrastructure to maritime and event operations, manage risk with
+              more clarity, ownership and control.
+            </p>
+          </Reveal>
+
+          <Reveal delay={0.12}>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a
                 href="#construction"
-                className="rounded-full border border-neutral-300 px-6 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-white"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
               >
-                Explore solutions
-              </Link>
+                Construction
+              </a>
+              <a
+                href="#infrastructure"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
+              >
+                Infrastructure
+              </a>
+              <a
+                href="#maritime"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
+              >
+                Maritime & Offshore
+              </a>
+              <a
+                href="#event-management"
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
+              >
+                Event Management
+              </a>
             </div>
-          </div>
+          </Reveal>
         </div>
-      </section>
 
-      <section className="bg-white">
-        <div className="mx-auto max-w-[1180px] px-6 py-24 sm:px-8 lg:px-10 lg:py-28">
-          <div className="max-w-[540px]">
-            <p className="text-sm font-semibold text-neutral-900">How it works</p>
-
-            <h2 className="mt-4 text-[48px] font-bold leading-[0.98] tracking-[-0.05em] sm:text-[64px]">
-              From risk to action in four steps.
-            </h2>
-          </div>
-
-          <div className="mt-14 grid gap-10 border-t border-neutral-200 pt-10 md:grid-cols-2 xl:grid-cols-4">
-            {steps.map((step) => (
-              <div key={step.number}>
-                <div className="text-[34px] font-semibold tracking-[-0.04em] text-neutral-300">
-                  {step.number}
-                </div>
-
-                <h3 className="mt-4 text-[22px] font-semibold tracking-[-0.03em] text-neutral-950">
-                  {step.title}
-                </h3>
-
-                <p className="mt-4 max-w-[260px] text-base leading-8 text-neutral-700">
-                  {step.text}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {sections.map((section) => (
-        <section
-          id={section.id}
-          key={section.id}
-          className={`${section.background} scroll-mt-28`}
-        >
-          <div className="mx-auto max-w-[1180px] px-6 py-24 sm:px-8 lg:px-10 lg:py-28">
-            <div
-              className={`grid items-center gap-14 lg:grid-cols-2 ${
-                section.reverse ? "lg:[&>*:first-child]:order-2" : ""
-              }`}
-            >
-              <div>
-                <div className="overflow-hidden rounded-[24px] bg-neutral-200">
-                  <Image
-                    src={section.image}
-                    alt={section.alt}
-                    width={1200}
-                    height={900}
-                    className="h-[360px] w-full object-cover sm:h-[430px]"
-                  />
-                </div>
-              </div>
-
-              <div className="max-w-[540px]">
-                <p className="text-sm font-semibold text-neutral-900">
-                  {section.eyebrow}
-                </p>
-
-                <div className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-violet-600">
-                  {section.label}
-                </div>
-
-                <h2 className="mt-4 text-[46px] font-bold leading-[0.98] tracking-[-0.05em] text-neutral-950 sm:text-[62px]">
-                  {section.title}
-                </h2>
-
-                <p className="mt-6 text-lg leading-8 text-neutral-700">
-                  {section.text}
-                </p>
-
-                <div className="mt-8 space-y-0">
-                  {section.bullets.map((item) => (
-                    <div
-                      key={item}
-                      className="border-t border-neutral-200 py-4 text-base leading-7 text-neutral-900"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-10 flex flex-wrap gap-4">
-                  <Link
-                    href="/book-demo"
-                    className="rounded-full bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-                  >
-                    Book a demo
-                  </Link>
-
-                  <Link
-                    href="/pricing"
-                    className="rounded-full border border-neutral-300 px-6 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
-                  >
-                    View pricing
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      ))}
-
-      <section className="border-t border-neutral-200 bg-white">
-        <div className="mx-auto max-w-[980px] px-6 py-24 text-center sm:px-8 lg:py-28">
-          <p className="text-sm font-semibold text-neutral-900">Get started</p>
-
-          <h2 className="mt-4 text-[46px] font-bold leading-[0.98] tracking-[-0.05em] text-neutral-950 sm:text-[62px]">
-            See how RiskBases fits your team.
-          </h2>
-
-          <p className="mx-auto mt-6 max-w-[700px] text-lg leading-8 text-neutral-700">
-            Explore how your workflow can be structured inside RiskBases with a
-            clean, consistent setup for risk, actions, and reporting.
-          </p>
-
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              href="/book-demo"
-              className="rounded-full bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-violet-700"
-            >
-              Book a demo
-            </Link>
-
-            <Link
-              href="/contact"
-              className="rounded-full border border-neutral-300 px-6 py-3.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-50"
-            >
-              Contact us
-            </Link>
-          </div>
+        <div className="mx-auto mt-14 flex max-w-[1080px] flex-col gap-7">
+          {solutions.map((item, index) => (
+            <SolutionCard key={item.slug} item={item} index={index} />
+          ))}
         </div>
       </section>
     </main>

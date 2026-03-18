@@ -1,431 +1,1913 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { CalendarRange, Plus, X, Check, ChevronDown } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Calendar,
+  CalendarRange,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Filter,
+  Loader2,
+  Plus,
+  ShieldAlert,
+  Target,
+  User2,
+  Wrench,
+} from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// ⬇️ PAS DIT PAD AAN ALS JOUW SUPABASE CLIENT ELDERS STAAT
+import { supabase } from "@/lib/supabase/client";
 
-type TimelineEvent = {
+type Project = {
+  id: string;
+  name: string;
+  status: string | null;
+  project_value: string | number | null;
+  start_date: string | null;
+  end_date: string | null;
+  project_phase: string | null;
+  client_name: string | null;
+  project_type: string | null;
+  city: string | null;
+};
+
+type TimelinePhase = {
   id: string;
   project_id: string;
   title: string;
   description: string | null;
-  start_date: string;
+  start_date: string | null;
   end_date: string | null;
-  type: "phase" | "milestone" | "review" | "delivery";
-  status: "planned" | "in_progress" | "completed" | "delayed";
+  type: string | null;
+  status: string | null;
   owner_stakeholder_id: string | null;
-  created_by: string | null;
-  created_at: string;
 };
 
-type Stakeholder = { id: string; name: string };
-type LinkedRisk = { id: string; title: string; level: string };
-type LinkedAction = { id: string; title: string; status: string };
-
-const TYPE_COLORS: Record<string, { bg: string; text: string; bar: string; border: string }> = {
-  phase:     { bg: "#ede9fb", text: "#6d28d9", bar: "#7c3aed", border: "#c4b5fd" },
-  milestone: { bg: "#fffbeb", text: "#d97706", bar: "#f59e0b", border: "#fcd34d" },
-  review:    { bg: "#eff6ff", text: "#2563eb", bar: "#3b82f6", border: "#93c5fd" },
-  delivery:  { bg: "#f0fdf4", text: "#16a34a", bar: "#22c55e", border: "#86efac" },
+type ProjectRisk = {
+  id: string;
+  project_id: string;
+  risk_code: string | null;
+  title: string;
+  description: string | null;
+  category: string | null;
+  risk_type: string | null;
+  source: string | null;
+  cause: string | null;
+  consequence: string | null;
+  probability: number | null;
+  impact: number | null;
+  score: number | null;
+  level: string | null;
+  status: string | null;
+  owner_user_id: string | null;
+  phase: string | null;
+  due_review_date: string | null;
+  identified_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  source_type: string | null;
+  source_template_id: string | null;
+  generation_reason: string | null;
+  review_status: string | null;
+  suggested_action: string | null;
 };
-const STATUS_COLORS: Record<string, { dot: string; text: string; bg: string }> = {
-  planned:     { dot: "#94a3b8", text: "#64748b",  bg: "#f8fafc" },
-  in_progress: { dot: "#3b82f6", text: "#2563eb",  bg: "#eff6ff" },
-  completed:   { dot: "#22c55e", text: "#16a34a",  bg: "#f0fdf4" },
-  delayed:     { dot: "#ef4444", text: "#dc2626",  bg: "#fef2f2" },
+
+type RiskAction = {
+  id: string;
+  project_id: string;
+  risk_id: string | null;
+  title: string;
+  description: string | null;
+  owner_user_id: string | null;
+  status: string | null;
+  priority: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
-function fmt(d: string) {
-  return new Date(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
-}
-function fmtShort(d: string) {
-  return new Date(d).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+type Stakeholder = {
+  id: string;
+  project_id: string;
+  name: string;
+  organization: string | null;
+  role: string | null;
+  stakeholder_type: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+type TimelineRiskLink = {
+  id: string;
+  timeline_id: string;
+  risk_id: string;
+};
+
+type TimelineActionLink = {
+  id: string;
+  timeline_id: string;
+  action_id: string;
+};
+
+type RiskRow = {
+  risk: ProjectRisk;
+  phaseIds: string[];
+  actions: RiskAction[];
+  owner?: Stakeholder | null;
+};
+
+const PHASE_BG = [
+  "#f3f4f6",
+  "#eef2ff",
+  "#f5f3ff",
+  "#ecfeff",
+  "#eff6ff",
+  "#f0fdf4",
+  "#fff7ed",
+  "#fef2f2",
+];
+
+const LEVEL_STYLES: Record<
+  string,
+  { bg: string; border: string; text: string; pill: string }
+> = {
+  low: {
+    bg: "linear-gradient(90deg, #6dbd64 0%, #5cae54 100%)",
+    border: "#4e9448",
+    text: "#14532d",
+    pill: "#dcfce7",
+  },
+  medium: {
+    bg: "linear-gradient(90deg, #93c45a 0%, #7cb342 100%)",
+    border: "#689f38",
+    text: "#365314",
+    pill: "#ecfccb",
+  },
+  high: {
+    bg: "linear-gradient(90deg, #fb923c 0%, #f97316 100%)",
+    border: "#ea580c",
+    text: "#9a3412",
+    pill: "#ffedd5",
+  },
+  critical: {
+    bg: "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)",
+    border: "#b91c1c",
+    text: "#991b1b",
+    pill: "#fee2e2",
+  },
+  default: {
+    bg: "linear-gradient(90deg, #64748b 0%, #475569 100%)",
+    border: "#334155",
+    text: "#334155",
+    pill: "#e2e8f0",
+  },
+};
+
+const ACTION_STATUS_STYLES: Record<
+  string,
+  { bg: string; text: string; dot: string }
+> = {
+  open: { bg: "#fef3c7", text: "#92400e", dot: "#f59e0b" },
+  in_progress: { bg: "#dbeafe", text: "#1d4ed8", dot: "#2563eb" },
+  done: { bg: "#dcfce7", text: "#166534", dot: "#16a34a" },
+  overdue: { bg: "#fee2e2", text: "#991b1b", dot: "#ef4444" },
+  default: { bg: "#e2e8f0", text: "#334155", dot: "#64748b" },
+};
+
+function fmtDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-// ─── Gantt bar calculation ────────────────────────────────────────────────────
-function getGanttRange(events: TimelineEvent[]) {
-  const dates = events.flatMap(e => [new Date(e.start_date), e.end_date ? new Date(e.end_date) : new Date(e.start_date)]);
-  const min = new Date(Math.min(...dates.map(d => d.getTime())));
-  const max = new Date(Math.max(...dates.map(d => d.getTime())));
-  // Add 10% padding
-  const pad = (max.getTime() - min.getTime()) * 0.05;
-  return { min: new Date(min.getTime() - pad), max: new Date(max.getTime() + pad) };
-}
-function ganttPos(date: string, min: Date, max: Date) {
-  const total = max.getTime() - min.getTime();
-  const offset = new Date(date).getTime() - min.getTime();
-  return Math.max(0, Math.min(100, (offset / total) * 100));
+function fmtShortDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
-// ─── Add event modal ──────────────────────────────────────────────────────────
-function AddEventModal({ projectId, stakeholders, onClose, onCreated }: {
-  projectId: string; stakeholders: Stakeholder[];
-  onClose: () => void; onCreated: (e: TimelineEvent) => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [type, setType] = useState<TimelineEvent["type"]>("phase");
-  const [status, setStatus] = useState<TimelineEvent["status"]>("planned");
-  const [ownerId, setOwnerId] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+function formatMoney(value?: string | number | null) {
+  if (value === null || value === undefined || value === "") return "—";
+  const num =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/[^\d.-]/g, ""));
+  if (Number.isNaN(num)) return String(value);
+  return new Intl.NumberFormat("nl-NL", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(num);
+}
 
-  async function handleSave() {
-    if (!title.trim() || !startDate) { setErr("Titel en startdatum zijn verplicht."); return; }
-    setSaving(true); setErr("");
-    const { data, error } = await supabase.from("project_timeline").insert({
-      project_id: projectId, title: title.trim(), description: desc||null,
-      start_date: startDate, end_date: endDate||null,
-      type, status, owner_stakeholder_id: ownerId||null,
-    }).select("*").single();
-    setSaving(false);
-    if (error) { setErr(error.message); return; }
-    onCreated(data as TimelineEvent);
-    onClose();
+function normalizeLevel(level?: string | null, score?: number | null) {
+  const raw = String(level ?? "").trim().toLowerCase();
+
+  if (["kritiek", "critical", "urgent"].includes(raw)) return "critical";
+  if (["hoog", "high"].includes(raw)) return "high";
+  if (["middel", "medium", "gemiddeld"].includes(raw)) return "medium";
+  if (["laag", "low"].includes(raw)) return "low";
+
+  if (typeof score === "number") {
+    if (score >= 16) return "critical";
+    if (score >= 10) return "high";
+    if (score >= 5) return "medium";
+    return "low";
   }
 
+  return "default";
+}
+
+function normalizeActionStatus(
+  status?: string | null,
+  dueDate?: string | null,
+  completedAt?: string | null
+) {
+  if (completedAt) return "done";
+  const raw = String(status ?? "").trim().toLowerCase();
+  if (["done", "completed", "afgerond"].includes(raw)) return "done";
+  if (["in_progress", "in progress", "bezig"].includes(raw)) return "in_progress";
+  if (["open", "todo", "nieuw"].includes(raw)) {
+    if (dueDate && new Date(dueDate) < new Date()) return "overdue";
+    return "open";
+  }
+  if (dueDate && new Date(dueDate) < new Date()) return "overdue";
+  return "default";
+}
+
+function daysBetween(a?: string | null, b?: string | null) {
+  if (!a || !b) return null;
+  const start = new Date(a).getTime();
+  const end = new Date(b).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return Math.max(0, Math.ceil((end - start) / 86400000));
+}
+
+function daysOpen(risk: ProjectRisk) {
+  const start = risk.identified_at ?? risk.created_at;
+  if (!start) return null;
+  return daysBetween(start, new Date().toISOString());
+}
+
+function getProjectRange(
+  project: Project | null,
+  phases: TimelinePhase[],
+  risks: ProjectRisk[],
+  riskPhaseLookup: Map<string, TimelinePhase[]>
+) {
+  const candidates: number[] = [];
+
+  if (project?.start_date) candidates.push(new Date(project.start_date).getTime());
+  if (project?.end_date) candidates.push(new Date(project.end_date).getTime());
+
+  phases.forEach((p) => {
+    if (p.start_date) candidates.push(new Date(p.start_date).getTime());
+    if (p.end_date) candidates.push(new Date(p.end_date).getTime());
+  });
+
+  risks.forEach((r) => {
+    const linked = riskPhaseLookup.get(r.id) ?? [];
+    linked.forEach((p) => {
+      if (p.start_date) candidates.push(new Date(p.start_date).getTime());
+      if (p.end_date) candidates.push(new Date(p.end_date).getTime());
+    });
+    if (r.identified_at) candidates.push(new Date(r.identified_at).getTime());
+    if (r.due_review_date) candidates.push(new Date(r.due_review_date).getTime());
+  });
+
+  const valid = candidates.filter((x) => !Number.isNaN(x)).sort((a, b) => a - b);
+
+  if (!valid.length) {
+    const now = new Date();
+    return {
+      min: new Date(now.getFullYear(), now.getMonth(), 1),
+      max: new Date(now.getFullYear(), now.getMonth() + 6, 0),
+    };
+  }
+
+  const min = new Date(valid[0]);
+  const max = new Date(valid[valid.length - 1]);
+
+  min.setDate(1);
+  max.setMonth(max.getMonth() + 1);
+  max.setDate(0);
+
+  return { min, max };
+}
+
+function posPct(dateStr: string, min: Date, max: Date) {
+  const d = new Date(dateStr).getTime();
+  const start = min.getTime();
+  const end = max.getTime();
+  if (Number.isNaN(d) || end <= start) return 0;
+  return ((d - start) / (end - start)) * 100;
+}
+
+function clamp(num: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, num));
+}
+
+function getMonthMarkers(min: Date, max: Date) {
+  const markers: { label: string; pct: number }[] = [];
+  const d = new Date(min);
+  d.setDate(1);
+
+  while (d <= max) {
+    markers.push({
+      label: d.toLocaleDateString("nl-NL", {
+        month: "short",
+        year: "2-digit",
+      }),
+      pct: posPct(d.toISOString(), min, max),
+    });
+    d.setMonth(d.getMonth() + 1);
+  }
+
+  return markers;
+}
+
+function deriveRiskRange(risk: ProjectRisk, linkedPhases: TimelinePhase[]) {
+  const sorted = [...linkedPhases].sort((a, b) =>
+    String(a.start_date ?? "").localeCompare(String(b.start_date ?? ""))
+  );
+
+  const start =
+    sorted.find((p) => p.start_date)?.start_date ??
+    risk.identified_at ??
+    risk.created_at ??
+    null;
+
+  const end =
+    [...sorted].reverse().find((p) => p.end_date)?.end_date ??
+    risk.due_review_date ??
+    risk.updated_at ??
+    start;
+
+  return { start, end };
+}
+
+function initials(name?: string | null) {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((x) => x[0]?.toUpperCase())
+    .join("");
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  accent: string;
+}) {
   return (
-    <div style={{ position:"fixed",inset:0,zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(15,23,42,0.4)",backdropFilter:"blur(4px)",padding:16 }}
-      onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
-      <div style={{ width:"100%",maxWidth:520,background:"white",borderRadius:20,border:"1px solid #e8eaf0",boxShadow:"0 24px 80px rgba(15,23,42,0.2)",overflow:"hidden" }}>
-        <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 24px",borderBottom:"1px solid #f1f5f9" }}>
-          <h3 style={{ fontSize:18,fontWeight:700,color:"#0f172a" }}>Nieuw timeline event</h3>
-          <button onClick={onClose} style={{ height:32,width:32,borderRadius:8,border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8" }}><X style={{height:16,width:16}}/></button>
-        </div>
-        <div style={{ padding:"20px 24px",display:"flex",flexDirection:"column",gap:14 }}>
-          <div>
-            <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Titel *</label>
-            <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="bijv. Ontwerpfase" autoFocus
-              style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,outline:"none",boxSizing:"border-box" }}/>
-          </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
-            <div>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Type</label>
-              <select value={type} onChange={e=>setType(e.target.value as any)}
-                style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,background:"white",outline:"none" }}>
-                <option value="phase">Fase</option>
-                <option value="milestone">Milestone</option>
-                <option value="review">Review</option>
-                <option value="delivery">Oplevering</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Status</label>
-              <select value={status} onChange={e=>setStatus(e.target.value as any)}
-                style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,background:"white",outline:"none" }}>
-                <option value="planned">Gepland</option>
-                <option value="in_progress">Bezig</option>
-                <option value="completed">Afgerond</option>
-                <option value="delayed">Vertraagd</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:12 }}>
-            <div>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Startdatum *</label>
-              <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)}
-                style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,outline:"none",boxSizing:"border-box" }}/>
-            </div>
-            <div>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Einddatum</label>
-              <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}
-                style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,outline:"none",boxSizing:"border-box" }}/>
-            </div>
-          </div>
-          {stakeholders.length > 0 && (
-            <div>
-              <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Verantwoordelijke</label>
-              <select value={ownerId} onChange={e=>setOwnerId(e.target.value)}
-                style={{ width:"100%",height:40,borderRadius:10,border:"1px solid #e2e8f0",padding:"0 12px",fontSize:14,background:"white",outline:"none" }}>
-                <option value="">Geen</option>
-                {stakeholders.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div>
-            <label style={{ display:"block",fontSize:13,fontWeight:600,color:"#374151",marginBottom:6 }}>Beschrijving</label>
-            <textarea value={desc} onChange={e=>setDesc(e.target.value)} rows={2} placeholder="Optioneel..."
-              style={{ width:"100%",borderRadius:10,border:"1px solid #e2e8f0",padding:"10px 12px",fontSize:14,outline:"none",resize:"vertical",boxSizing:"border-box" }}/>
-          </div>
-          {err && <p style={{ fontSize:13,color:"#dc2626",background:"#fef2f2",borderRadius:8,padding:"8px 12px" }}>{err}</p>}
-        </div>
-        <div style={{ display:"flex",justifyContent:"flex-end",gap:10,padding:"16px 24px",borderTop:"1px solid #f1f5f9" }}>
-          <button onClick={onClose} style={{ height:38,borderRadius:10,border:"1px solid #e2e8f0",background:"white",padding:"0 18px",fontSize:13,fontWeight:600,color:"#374151",cursor:"pointer" }}>Annuleren</button>
-          <button onClick={handleSave} disabled={saving} style={{ height:38,borderRadius:10,border:"none",background:"#7c3aed",padding:"0 18px",fontSize:13,fontWeight:600,color:"white",cursor:"pointer",opacity:saving?0.7:1 }}>
-            {saving ? "Opslaan..." : "Event toevoegen"}
-          </button>
-        </div>
+    <div
+      style={{
+        background: "white",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        padding: 18,
+        minHeight: 98,
+        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: accent + "15",
+          color: accent,
+          marginBottom: 12,
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ marginTop: 8, fontSize: 13, color: "#64748b", fontWeight: 600 }}>
+        {label}
       </div>
     </div>
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function ProjectTimelinePage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [phases, setPhases] = useState<TimelinePhase[]>([]);
+  const [risks, setRisks] = useState<ProjectRisk[]>([]);
+  const [actions, setActions] = useState<RiskAction[]>([]);
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [timelineRiskLinks, setTimelineRiskLinks] = useState<TimelineRiskLink[]>([]);
+  const [timelineActionLinks, setTimelineActionLinks] = useState<TimelineActionLink[]>([]);
+
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
-  const [view, setView] = useState<"timeline"|"gantt">("timeline");
+  const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
+
+  const [phaseFilter, setPhaseFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  async function loadPage() {
+    if (!projectId) return;
+
+    setLoading(true);
+
+    const [
+      projectRes,
+      phasesRes,
+      risksRes,
+      actionsRes,
+      stakeholdersRes,
+      timelineRisksRes,
+      timelineActionsRes,
+    ] = await Promise.all([
+      supabase.from("projects").select("*").eq("id", projectId).single(),
+      supabase
+        .from("project_timeline")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("start_date", { ascending: true }),
+      supabase
+        .from("project_risks")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("score", { ascending: false }),
+      supabase
+        .from("risk_actions")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("due_date", { ascending: true }),
+      supabase
+        .from("project_stakeholders")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("name", { ascending: true }),
+      supabase.from("timeline_risks").select("*"),
+      supabase.from("timeline_actions").select("*"),
+    ]);
+
+    setProject((projectRes.data ?? null) as Project | null);
+    setPhases(((phasesRes.data ?? []) as TimelinePhase[]).filter((p) => (p.type ?? "phase") === "phase"));
+    setRisks((risksRes.data ?? []) as ProjectRisk[]);
+    setActions((actionsRes.data ?? []) as RiskAction[]);
+    setStakeholders((stakeholdersRes.data ?? []) as Stakeholder[]);
+    setTimelineRiskLinks((timelineRisksRes.data ?? []) as TimelineRiskLink[]);
+    setTimelineActionLinks((timelineActionsRes.data ?? []) as TimelineActionLink[]);
+
+    const firstRisk = (risksRes.data ?? [])[0] as ProjectRisk | undefined;
+    setSelectedRiskId((prev) => prev ?? firstRisk?.id ?? null);
+
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const [{ data: ed }, { data: sd }] = await Promise.all([
-        supabase.from("project_timeline").select("*").eq("project_id", projectId).order("start_date", { ascending: true }),
-        supabase.from("project_stakeholders").select("id, name").eq("project_id", projectId),
-      ]);
-      setEvents((ed ?? []) as TimelineEvent[]);
-      setStakeholders((sd ?? []) as Stakeholder[]);
-      setLoading(false);
-    }
-    if (projectId) load();
+    loadPage();
   }, [projectId]);
 
-  const ganttRange = events.length > 0 ? getGanttRange(events) : null;
+  const stakeholderMap = useMemo(() => {
+    return new Map(stakeholders.map((s) => [s.id, s]));
+  }, [stakeholders]);
 
-  // Generate month markers for Gantt header
-  const monthMarkers = (() => {
-    if (!ganttRange) return [];
-    const markers: { label: string; pct: number }[] = [];
-    const d = new Date(ganttRange.min);
-    d.setDate(1);
-    while (d <= ganttRange.max) {
-      markers.push({ label: d.toLocaleDateString("nl-NL", { month: "short", year: "2-digit" }), pct: ganttPos(d.toISOString(), ganttRange.min, ganttRange.max) });
-      d.setMonth(d.getMonth() + 1);
-    }
-    return markers;
-  })();
+  const phaseMap = useMemo(() => {
+    return new Map(phases.map((p) => [p.id, p]));
+  }, [phases]);
 
-  // Today marker
-  const todayPct = ganttRange ? ganttPos(new Date().toISOString(), ganttRange.min, ganttRange.max) : null;
+  const riskPhaseLookup = useMemo(() => {
+    const map = new Map<string, TimelinePhase[]>();
+
+    timelineRiskLinks.forEach((link) => {
+      const phase = phaseMap.get(link.timeline_id);
+      if (!phase) return;
+      const current = map.get(link.risk_id) ?? [];
+      current.push(phase);
+      map.set(link.risk_id, current);
+    });
+
+    risks.forEach((risk) => {
+      if (!map.has(risk.id) && risk.phase) {
+        const matched = phases.filter(
+          (p) => p.title?.toLowerCase() === risk.phase?.toLowerCase()
+        );
+        if (matched.length) map.set(risk.id, matched);
+      }
+    });
+
+    return map;
+  }, [timelineRiskLinks, phaseMap, phases, risks]);
+
+  const actionPhaseLookup = useMemo(() => {
+    const map = new Map<string, TimelinePhase[]>();
+
+    timelineActionLinks.forEach((link) => {
+      const phase = phaseMap.get(link.timeline_id);
+      if (!phase) return;
+      const current = map.get(link.action_id) ?? [];
+      current.push(phase);
+      map.set(link.action_id, current);
+    });
+
+    return map;
+  }, [timelineActionLinks, phaseMap]);
+
+  const rows = useMemo<RiskRow[]>(() => {
+    return risks.map((risk) => {
+      const owner =
+        risk.owner_user_id
+          ? stakeholders.find((s) => s.id === risk.owner_user_id) ?? null
+          : null;
+
+      const riskActions = actions.filter((a) => a.risk_id === risk.id);
+      const linkedPhases = riskPhaseLookup.get(risk.id) ?? [];
+
+      return {
+        risk,
+        owner,
+        actions: riskActions,
+        phaseIds: linkedPhases.map((p) => p.id),
+      };
+    });
+  }, [risks, actions, stakeholders, riskPhaseLookup]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const level = normalizeLevel(row.risk.level, row.risk.score);
+      const status = String(row.risk.status ?? "").toLowerCase();
+
+      const passPhase =
+        phaseFilter === "all" ||
+        (riskPhaseLookup.get(row.risk.id) ?? []).some((p) => p.id === phaseFilter);
+
+      const passLevel = levelFilter === "all" || level === levelFilter;
+      const passStatus = statusFilter === "all" || status === statusFilter;
+
+      return passPhase && passLevel && passStatus;
+    });
+  }, [rows, phaseFilter, levelFilter, statusFilter, riskPhaseLookup]);
+
+  const selectedRow =
+    filteredRows.find((r) => r.risk.id === selectedRiskId) ??
+    rows.find((r) => r.risk.id === selectedRiskId) ??
+    filteredRows[0] ??
+    rows[0] ??
+    null;
+
+  const activeRisks = risks.filter((r) => !["closed", "resolved", "done"].includes(String(r.status ?? "").toLowerCase())).length;
+  const criticalRisks = risks.filter((r) => normalizeLevel(r.level, r.score) === "critical").length;
+  const openActions = actions.filter((a) => normalizeActionStatus(a.status, a.due_date, a.completed_at) !== "done").length;
+  const upcomingChecks = risks.filter((r) => {
+    if (!r.due_review_date) return false;
+    const due = new Date(r.due_review_date).getTime();
+    const now = new Date().getTime();
+    const in14 = now + 14 * 86400000;
+    return due >= now && due <= in14;
+  }).length;
+
+  const range = useMemo(
+    () => getProjectRange(project, phases, risks, riskPhaseLookup),
+    [project, phases, risks, riskPhaseLookup]
+  );
+
+  const monthMarkers = useMemo(
+    () => getMonthMarkers(range.min, range.max),
+    [range.min, range.max]
+  );
+
+  const todayPct = clamp(posPct(new Date().toISOString(), range.min, range.max), 0, 100);
+
+  const upcomingItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      kind: "action" | "review";
+      date: string;
+      title: string;
+      subtitle: string;
+      riskId?: string;
+    }> = [];
+
+    actions.forEach((a) => {
+      if (a.due_date && normalizeActionStatus(a.status, a.due_date, a.completed_at) !== "done") {
+        items.push({
+          id: a.id,
+          kind: "action",
+          date: a.due_date,
+          title: a.title,
+          subtitle: a.description ?? "Actiepunt",
+          riskId: a.risk_id ?? undefined,
+        });
+      }
+    });
+
+    risks.forEach((r) => {
+      if (r.due_review_date) {
+        items.push({
+          id: r.id + "-review",
+          kind: "review",
+          date: r.due_review_date,
+          title: `Review: ${r.title}`,
+          subtitle: "Risico reviewmoment",
+          riskId: r.id,
+        });
+      }
+    });
+
+    return items
+      .filter((x) => {
+        const d = new Date(x.date).getTime();
+        return !Number.isNaN(d);
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 8);
+  }, [actions, risks]);
 
   return (
-    <div style={{ padding:"28px 28px 40px", background:"#f7f7fb", minHeight:"100%" }}>
-      {/* Header */}
-      <div style={{ display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:24,gap:16,flexWrap:"wrap" }}>
-        <div>
-          <div style={{ display:"inline-flex",alignItems:"center",gap:6,background:"#ede9fb",borderRadius:20,padding:"4px 12px",marginBottom:10 }}>
-            <CalendarRange style={{height:13,width:13,color:"#6d28d9"}}/>
-            <span style={{fontSize:11,fontWeight:700,color:"#6d28d9",letterSpacing:"0.1em",textTransform:"uppercase"}}>Timeline</span>
-          </div>
-          <h1 style={{fontSize:34,fontWeight:700,color:"#0f172a",letterSpacing:"-0.02em"}}>Project Timeline</h1>
-          <p style={{fontSize:15,color:"#64748b",marginTop:4}}>Fases, milestones en sleutelmomenten</p>
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          {/* View toggle */}
-          <div style={{display:"flex",border:"1px solid #e2e8f0",borderRadius:10,overflow:"hidden",background:"white"}}>
-            {(["timeline","gantt"] as const).map(v => (
-              <button key={v} onClick={() => setView(v)} style={{
-                height:38,padding:"0 16px",fontSize:13,fontWeight:600,border:"none",cursor:"pointer",
-                background: view===v ? "#7c3aed" : "transparent",
-                color: view===v ? "white" : "#64748b",
-              }}>{v==="timeline" ? "📋 Lijst" : "📊 Gantt"}</button>
-            ))}
-          </div>
-          <button onClick={() => setShowModal(true)} style={{display:"flex",alignItems:"center",gap:8,height:40,borderRadius:10,background:"#7c3aed",padding:"0 18px",fontSize:13,fontWeight:600,color:"white",border:"none",cursor:"pointer"}}>
-            <Plus style={{height:14,width:14}}/> Event toevoegen
-          </button>
-        </div>
-      </div>
+    <div
+      style={{
+        minHeight: "100%",
+        background: "#f6f8fb",
+        padding: "24px 24px 36px",
+      }}
+    >
+      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 22,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#eef2ff",
+                color: "#4338ca",
+                borderRadius: 999,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                marginBottom: 10,
+              }}
+            >
+              <CalendarRange style={{ width: 14, height: 14 }} />
+              Project Timeline
+            </div>
 
-      {loading ? (
-        <div style={{textAlign:"center",padding:80,color:"#94a3b8"}}>Laden...</div>
-      ) : events.length === 0 ? (
-        <div style={{background:"white",borderRadius:16,border:"2px dashed #e2e8f0",padding:72,textAlign:"center"}}>
-          <div style={{height:64,width:64,borderRadius:20,background:"#ede9fb",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}>
-            <CalendarRange style={{height:32,width:32,color:"#7c3aed"}}/>
-          </div>
-          <p style={{fontSize:18,fontWeight:700,color:"#1e293b",marginBottom:8}}>Nog geen timeline events</p>
-          <p style={{fontSize:14,color:"#94a3b8",marginBottom:24}}>Voeg fases, milestones en opleveringen toe om je project bij te houden.</p>
-          <button onClick={() => setShowModal(true)} style={{display:"inline-flex",alignItems:"center",gap:8,height:42,borderRadius:10,background:"#7c3aed",padding:"0 22px",fontSize:14,fontWeight:600,color:"white",border:"none",cursor:"pointer"}}>
-            <Plus style={{height:15,width:15}}/> Eerste event toevoegen
-          </button>
-        </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 36,
+                  lineHeight: 1.05,
+                  letterSpacing: "-0.03em",
+                  color: "#0f172a",
+                  fontWeight: 800,
+                }}
+              >
+                {project?.name ?? "Project Timeline"}
+              </h1>
 
-      ) : view === "gantt" ? (
-        /* ── GANTT VIEW ── */
-        <div style={{background:"white",borderRadius:16,border:"1px solid #e8eaf0",overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,0.04)"}}>
-          <div style={{padding:"16px 20px",borderBottom:"1px solid #f1f5f9",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <h3 style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>Gantt overzicht</h3>
-            {ganttRange && <p style={{fontSize:12,color:"#94a3b8"}}>{fmtShort(ganttRange.min.toISOString())} → {fmtShort(ganttRange.max.toISOString())}</p>}
-          </div>
-          <div style={{padding:20}}>
-            {/* Month header */}
-            <div style={{display:"flex",marginBottom:8,paddingLeft:220}}>
-              <div style={{flex:1,position:"relative",height:20}}>
-                {monthMarkers.map((m,i) => (
-                  <span key={i} style={{position:"absolute",left:`${m.pct}%`,fontSize:11,color:"#94a3b8",fontWeight:500,transform:"translateX(-50%)",whiteSpace:"nowrap"}}>{m.label}</span>
-                ))}
+              <div
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 12,
+                  background: "#dbeafe",
+                  color: "#1d4ed8",
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                Fase: {project?.project_phase ?? project?.status ?? "Onbekend"}
               </div>
             </div>
-            {/* Gantt rows */}
-            {events.map(event => {
-              const tc = TYPE_COLORS[event.type] ?? TYPE_COLORS.phase;
-              const sc = STATUS_COLORS[event.status] ?? STATUS_COLORS.planned;
-              const left = ganttRange ? ganttPos(event.start_date, ganttRange.min, ganttRange.max) : 0;
-              const right = ganttRange ? ganttPos(event.end_date || event.start_date, ganttRange.min, ganttRange.max) : left + 5;
-              const width = Math.max(right - left, 1.5);
-              return (
-                <div key={event.id} style={{display:"flex",alignItems:"center",gap:0,marginBottom:10}}>
-                  {/* Label */}
-                  <div style={{width:220,flexShrink:0,paddingRight:12}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{width:8,height:8,borderRadius:"50%",background:sc.dot,flexShrink:0}}/>
-                      <span style={{fontSize:13,fontWeight:600,color:"#1e293b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:180}}>{event.title}</span>
-                    </div>
-                    <div style={{display:"flex",gap:6,marginTop:3,paddingLeft:16}}>
-                      <span style={{fontSize:10,fontWeight:700,color:tc.text,background:tc.bg,padding:"1px 6px",borderRadius:10}}>{event.type}</span>
-                    </div>
-                  </div>
-                  {/* Bar */}
-                  <div style={{flex:1,position:"relative",height:28,background:"#f8fafc",borderRadius:8,overflow:"visible"}}>
-                    {/* Today line */}
-                    {todayPct !== null && todayPct >= 0 && todayPct <= 100 && (
-                      <div style={{position:"absolute",left:`${todayPct}%`,top:-4,bottom:-4,width:2,background:"#ef4444",zIndex:5,opacity:0.6,borderRadius:1}}/>
-                    )}
-                    <div style={{
-                      position:"absolute",left:`${left}%`,width:`${width}%`,
-                      height:28,borderRadius:8,background:tc.bar,
-                      display:"flex",alignItems:"center",paddingLeft:8,
-                      boxShadow:"0 1px 3px rgba(0,0,0,0.1)",cursor:"pointer",
-                      minWidth:6,
-                    }} onClick={() => setSelectedEvent(event)}>
-                      {width > 8 && <span style={{fontSize:11,fontWeight:600,color:"white",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{fmtShort(event.start_date)}</span>}
-                    </div>
-                    {/* Month gridlines */}
-                    {monthMarkers.map((m,i) => (
-                      <div key={i} style={{position:"absolute",left:`${m.pct}%`,top:0,bottom:0,width:1,background:"#e8eaf0",pointerEvents:"none"}}/>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+
+            <div
+              style={{
+                display: "flex",
+                gap: 18,
+                flexWrap: "wrap",
+                marginTop: 10,
+                color: "#64748b",
+                fontSize: 14,
+              }}
+            >
+              <span>
+                Projectwaarde:{" "}
+                <strong style={{ color: "#0f172a" }}>
+                  {formatMoney(project?.project_value)}
+                </strong>
+              </span>
+              <span>
+                {fmtDate(project?.start_date)} — {fmtDate(project?.end_date)}
+              </span>
+              {project?.client_name && <span>Klant: {project.client_name}</span>}
+              {project?.city && <span>Locatie: {project.city}</span>}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              style={{
+                height: 42,
+                padding: "0 16px",
+                borderRadius: 12,
+                border: "1px solid #dbe2ea",
+                background: "white",
+                color: "#1e293b",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Plus style={{ width: 14, height: 14 }} />
+              Risico toevoegen
+            </button>
+            <button
+              style={{
+                height: 42,
+                padding: "0 16px",
+                borderRadius: 12,
+                border: "1px solid #dbe2ea",
+                background: "white",
+                color: "#1e293b",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Plus style={{ width: 14, height: 14 }} />
+              Actiepunt
+            </button>
+            <button
+              style={{
+                height: 42,
+                padding: "0 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Update fase
+            </button>
           </div>
         </div>
 
-      ) : (
-        /* ── TIMELINE LIST VIEW ── */
-        <div style={{position:"relative"}}>
-          {/* Vertical line */}
-          <div style={{position:"absolute",left:20,top:0,bottom:0,width:2,background:"#e2e8f0",borderRadius:1}}/>
-          <div style={{display:"flex",flexDirection:"column",gap:14,paddingLeft:52}}>
-            {events.map((event, i) => {
-              const tc = TYPE_COLORS[event.type] ?? TYPE_COLORS.phase;
-              const sc = STATUS_COLORS[event.status] ?? STATUS_COLORS.planned;
-              const owner = stakeholders.find(s => s.id === event.owner_stakeholder_id);
-              return (
-                <div key={event.id} style={{position:"relative"}}>
-                  {/* Dot on line */}
-                  <div style={{
-                    position:"absolute",left:-40,top:20,width:16,height:16,borderRadius:"50%",
-                    background:sc.dot,border:"3px solid white",
-                    boxShadow:`0 0 0 3px ${sc.dot}30`,
-                  }}/>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 14,
+            marginBottom: 18,
+          }}
+        >
+          <SummaryCard
+            icon={<ShieldAlert style={{ width: 18, height: 18 }} />}
+            label="Actieve risico’s"
+            value={activeRisks}
+            accent="#2563eb"
+          />
+          <SummaryCard
+            icon={<AlertTriangle style={{ width: 18, height: 18 }} />}
+            label="Kritieke risico’s"
+            value={criticalRisks}
+            accent="#dc2626"
+          />
+          <SummaryCard
+            icon={<Wrench style={{ width: 18, height: 18 }} />}
+            label="Open actiepunten"
+            value={openActions}
+            accent="#ea580c"
+          />
+          <SummaryCard
+            icon={<Clock3 style={{ width: 18, height: 18 }} />}
+            label="Aankomende checks"
+            value={upcomingChecks}
+            accent="#16a34a"
+          />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) 340px",
+            gap: 18,
+            alignItems: "start",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 18,
+                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: 16,
+                  borderBottom: "1px solid #eef2f7",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <div
-                    onClick={() => setSelectedEvent(selectedEvent?.id === event.id ? null : event)}
-                    style={{background:"white",borderRadius:14,border:`1px solid ${selectedEvent?.id===event.id ? "#c4b5fd" : "#e8eaf0"}`,padding:"16px 20px",boxShadow:"0 1px 3px rgba(0,0,0,0.04)",cursor:"pointer",transition:"border-color 200ms"}}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "0 12px",
+                      height: 40,
+                      borderRadius: 12,
+                      border: "1px solid #dbe2ea",
+                      background: "#fff",
+                    }}
                   >
-                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,flexWrap:"wrap"}}>
-                          <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`}}>{event.type}</span>
-                          <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:sc.bg,color:sc.text}}>{event.status.replace("_"," ")}</span>
-                          {owner && <span style={{fontSize:11,color:"#64748b"}}>👤 {owner.name}</span>}
+                    <Filter style={{ width: 14, height: 14, color: "#64748b" }} />
+                    <select
+                      value={phaseFilter}
+                      onChange={(e) => setPhaseFilter(e.target.value)}
+                      style={{
+                        border: "none",
+                        outline: "none",
+                        background: "transparent",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      <option value="all">Alle fases</option>
+                      {phases.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown style={{ width: 14, height: 14, color: "#94a3b8" }} />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "0 12px",
+                      height: 40,
+                      borderRadius: 12,
+                      border: "1px solid #dbe2ea",
+                      background: "#fff",
+                    }}
+                  >
+                    <ShieldAlert style={{ width: 14, height: 14, color: "#64748b" }} />
+                    <select
+                      value={levelFilter}
+                      onChange={(e) => setLevelFilter(e.target.value)}
+                      style={{
+                        border: "none",
+                        outline: "none",
+                        background: "transparent",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      <option value="all">Alle prioriteiten</option>
+                      <option value="critical">Kritiek</option>
+                      <option value="high">Hoog</option>
+                      <option value="medium">Midden</option>
+                      <option value="low">Laag</option>
+                    </select>
+                    <ChevronDown style={{ width: 14, height: 14, color: "#94a3b8" }} />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "0 12px",
+                      height: 40,
+                      borderRadius: 12,
+                      border: "1px solid #dbe2ea",
+                      background: "#fff",
+                    }}
+                  >
+                    <Clock3 style={{ width: 14, height: 14, color: "#64748b" }} />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      style={{
+                        border: "none",
+                        outline: "none",
+                        background: "transparent",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      <option value="all">Alle statussen</option>
+                      <option value="open">Open</option>
+                      <option value="monitoring">Monitoring</option>
+                      <option value="mitigating">Mitigating</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                    <ChevronDown style={{ width: 14, height: 14, color: "#94a3b8" }} />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>
+                  {filteredRows.length} risico’s zichtbaar
+                </div>
+              </div>
+
+              {loading ? (
+                <div
+                  style={{
+                    minHeight: 420,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 10,
+                    color: "#64748b",
+                  }}
+                >
+                  <Loader2 className="animate-spin" style={{ width: 18, height: 18 }} />
+                  Laden...
+                </div>
+              ) : filteredRows.length === 0 ? (
+                <div
+                  style={{
+                    padding: 60,
+                    textAlign: "center",
+                    color: "#64748b",
+                  }}
+                >
+                  Geen risico’s gevonden voor deze filters.
+                </div>
+              ) : (
+                <div style={{ padding: 16 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "280px minmax(700px, 1fr)",
+                      border: "1px solid #e8edf3",
+                      borderRadius: 16,
+                      overflowX: "auto",
+                    }}
+                  >
+                    <div style={{ background: "#fff" }}>
+                      <div
+                        style={{
+                          height: 88,
+                          borderBottom: "1px solid #e8edf3",
+                          display: "flex",
+                          alignItems: "center",
+                          padding: "0 16px",
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                        }}
+                      >
+                        Risico’s
+                      </div>
+
+                      {filteredRows.map((row, idx) => {
+                        const level = normalizeLevel(row.risk.level, row.risk.score);
+                        const styles = LEVEL_STYLES[level] ?? LEVEL_STYLES.default;
+                        const linkedPhases = riskPhaseLookup.get(row.risk.id) ?? [];
+                        const owner = row.owner;
+                        const selected = selectedRow?.risk.id === row.risk.id;
+
+                        return (
+                          <div
+                            key={row.risk.id}
+                            onClick={() => setSelectedRiskId(row.risk.id)}
+                            style={{
+                              minHeight: 78,
+                              padding: "14px 16px",
+                              borderBottom:
+                                idx === filteredRows.length - 1
+                                  ? "none"
+                                  : "1px solid #eef2f7",
+                              cursor: "pointer",
+                              background: selected ? "#f8fbff" : "white",
+                              borderRight: selected ? "2px solid #2563eb" : "2px solid transparent",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                marginBottom: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 10,
+                                  height: 40,
+                                  borderRadius: 999,
+                                  background: styles.border,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div style={{ minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: "#0f172a",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {row.risk.title}
+                                </div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 6,
+                                    flexWrap: "wrap",
+                                    marginTop: 6,
+                                  }}
+                                >
+                                  {row.risk.category && (
+                                    <span
+                                      style={{
+                                        fontSize: 11,
+                                        padding: "4px 8px",
+                                        borderRadius: 999,
+                                        background: "#f1f5f9",
+                                        color: "#475569",
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {row.risk.category}
+                                    </span>
+                                  )}
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      padding: "4px 8px",
+                                      borderRadius: 999,
+                                      background: styles.pill,
+                                      color: styles.text,
+                                      fontWeight: 800,
+                                      textTransform: "capitalize",
+                                    }}
+                                  >
+                                    {level === "critical"
+                                      ? "Kritiek"
+                                      : level === "high"
+                                      ? "Hoog"
+                                      : level === "medium"
+                                      ? "Midden"
+                                      : level === "low"
+                                      ? "Laag"
+                                      : "Standaard"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
+                                fontSize: 12,
+                                color: "#64748b",
+                              }}
+                            >
+                              {owner && (
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                  <User2 style={{ width: 12, height: 12 }} />
+                                  {owner.name}
+                                </span>
+                              )}
+                              {linkedPhases[0]?.title && (
+                                <span>Fase: {linkedPhases[0].title}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ background: "#fff", position: "relative" }}>
+                      <div
+                        style={{
+                          position: "sticky",
+                          top: 0,
+                          zIndex: 2,
+                          background: "white",
+                          borderBottom: "1px solid #e8edf3",
+                        }}
+                      >
+                        <div style={{ position: "relative", height: 36, marginLeft: 0 }}>
+                          {monthMarkers.map((m, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                position: "absolute",
+                                left: `calc(${m.pct}% - 10px)`,
+                                top: 10,
+                                fontSize: 11,
+                                color: "#64748b",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {m.label}
+                            </div>
+                          ))}
                         </div>
-                        <h3 style={{fontSize:16,fontWeight:700,color:"#0f172a",marginBottom:4}}>{event.title}</h3>
-                        {event.description && <p style={{fontSize:13,color:"#64748b",marginBottom:8,lineHeight:1.5}}>{event.description}</p>}
-                        <div style={{display:"flex",alignItems:"center",gap:6}}>
-                          <CalendarRange style={{height:13,width:13,color:"#94a3b8"}}/>
-                          <span style={{fontSize:12,color:"#94a3b8"}}>
-                            {fmt(event.start_date)}
-                            {event.end_date && event.end_date !== event.start_date && ` → ${fmt(event.end_date)}`}
-                          </span>
-                          {event.end_date && (
-                            <span style={{fontSize:12,color:"#94a3b8"}}>
-                              · {Math.max(0, Math.ceil((new Date(event.end_date).getTime() - new Date(event.start_date).getTime()) / 86400000))} dagen
-                            </span>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: `repeat(${Math.max(phases.length, 1)}, minmax(120px, 1fr))`,
+                            gap: 0,
+                            minHeight: 52,
+                            borderTop: "1px solid #f1f5f9",
+                          }}
+                        >
+                          {phases.map((phase, idx) => (
+                            <div
+                              key={phase.id}
+                              style={{
+                                padding: "10px 12px",
+                                background: PHASE_BG[idx % PHASE_BG.length],
+                                borderRight: idx === phases.length - 1 ? "none" : "1px solid #e8edf3",
+                              }}
+                            >
+                              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
+                                {phase.title}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                                {fmtShortDate(phase.start_date)} — {fmtShortDate(phase.end_date)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ position: "relative" }}>
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            left: `${todayPct}%`,
+                            width: 2,
+                            background: "#ef4444",
+                            opacity: 0.45,
+                            zIndex: 1,
+                          }}
+                        />
+
+                        {monthMarkers.map((m, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              bottom: 0,
+                              left: `${m.pct}%`,
+                              width: 1,
+                              background: "#eef2f7",
+                              zIndex: 0,
+                            }}
+                          />
+                        ))}
+
+                        {filteredRows.map((row, idx) => {
+                          const linkedPhases = riskPhaseLookup.get(row.risk.id) ?? [];
+                          const level = normalizeLevel(row.risk.level, row.risk.score);
+                          const styles = LEVEL_STYLES[level] ?? LEVEL_STYLES.default;
+                          const selected = selectedRow?.risk.id === row.risk.id;
+                          const { start, end } = deriveRiskRange(row.risk, linkedPhases);
+
+                          const left = start ? clamp(posPct(start, range.min, range.max), 0, 100) : 0;
+                          const right = end ? clamp(posPct(end, range.min, range.max), 0, 100) : left + 8;
+                          const width = Math.max(6, right - left);
+
+                          return (
+                            <div
+                              key={row.risk.id}
+                              style={{
+                                position: "relative",
+                                minHeight: 78,
+                                borderBottom:
+                                  idx === filteredRows.length - 1
+                                    ? "none"
+                                    : "1px solid #eef2f7",
+                                background: selected ? "#fafcff" : "transparent",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  left: `${left}%`,
+                                  width: `${width}%`,
+                                  top: 16,
+                                  height: 36,
+                                  borderRadius: 12,
+                                  background: styles.bg,
+                                  border: `1px solid ${styles.border}`,
+                                  boxShadow: selected
+                                    ? "0 10px 18px rgba(37,99,235,0.16)"
+                                    : "0 4px 10px rgba(15,23,42,0.08)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  padding: "0 10px",
+                                  gap: 10,
+                                  zIndex: 2,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => setSelectedRiskId(row.risk.id)}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    color: "white",
+                                    opacity: 0.95,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {level === "critical"
+                                    ? "Kritiek"
+                                    : level === "high"
+                                    ? "Hoog"
+                                    : level === "medium"
+                                    ? "Midden"
+                                    : level === "low"
+                                    ? "Laag"
+                                    : "Risico"}
+                                </div>
+
+                                {width > 20 && (
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: "white",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {row.risk.status ?? "Monitoring"}
+                                  </div>
+                                )}
+
+                                {daysOpen(row.risk) !== null && width > 28 && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: "rgba(255,255,255,0.92)",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {daysOpen(row.risk)} dagen open
+                                  </div>
+                                )}
+                              </div>
+
+                              {row.actions.map((action) => {
+                                const linked = actionPhaseLookup.get(action.id) ?? [];
+                                const fallbackDate =
+                                  linked.find((p) => p.start_date)?.start_date ??
+                                  action.due_date ??
+                                  row.risk.due_review_date ??
+                                  row.risk.updated_at;
+
+                                if (!fallbackDate) return null;
+
+                                const x = clamp(posPct(fallbackDate, range.min, range.max), 0, 100);
+                                const st = normalizeActionStatus(
+                                  action.status,
+                                  action.due_date,
+                                  action.completed_at
+                                );
+                                const acStyle =
+                                  ACTION_STATUS_STYLES[st] ?? ACTION_STATUS_STYLES.default;
+
+                                return (
+                                  <div
+                                    key={action.id}
+                                    title={action.title}
+                                    style={{
+                                      position: "absolute",
+                                      left: `calc(${x}% - 7px)`,
+                                      top: 56,
+                                      width: 14,
+                                      height: 14,
+                                      borderRadius: "50%",
+                                      background: acStyle.dot,
+                                      border: "3px solid white",
+                                      boxShadow: "0 0 0 1px rgba(15,23,42,0.08)",
+                                      zIndex: 3,
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 14,
+                      display: "flex",
+                      gap: 18,
+                      flexWrap: "wrap",
+                      color: "#475569",
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span
+                        style={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: "50%",
+                          background: "#2563eb",
+                          display: "inline-block",
+                        }}
+                      />
+                      Inspectie / review / actiepunt
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span
+                        style={{
+                          width: 2,
+                          height: 14,
+                          background: "#ef4444",
+                          display: "inline-block",
+                        }}
+                      />
+                      Vandaag
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 16,
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 18,
+                boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "16px 18px",
+                  borderBottom: "1px solid #eef2f7",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                }}
+              >
+                <Calendar style={{ width: 17, height: 17, color: "#64748b" }} />
+                Vandaag & aankomende acties
+              </div>
+
+              <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                {upcomingItems.length === 0 ? (
+                  <div style={{ padding: 16, color: "#64748b" }}>
+                    Geen aankomende acties of reviews.
+                  </div>
+                ) : (
+                  upcomingItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => item.riskId && setSelectedRiskId(item.riskId)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        border: "1px solid #e8edf3",
+                        background: "#fff",
+                        borderRadius: 14,
+                        padding: "12px 14px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 12,
+                            background: item.kind === "review" ? "#dbeafe" : "#ffedd5",
+                            color: item.kind === "review" ? "#1d4ed8" : "#ea580c",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.kind === "review" ? (
+                            <Target style={{ width: 16, height: 16 }} />
+                          ) : (
+                            <CheckCircle2 style={{ width: 16, height: 16 }} />
                           )}
                         </div>
+
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                            {item.title}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                            {item.subtitle}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: 12,
+                          color: "#475569",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {fmtDate(item.date)}
+                        <ArrowRight style={{ width: 14, height: 14 }} />
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: 18,
+              boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+              overflow: "hidden",
+              position: "sticky",
+              top: 18,
+            }}
+          >
+            <div
+              style={{
+                padding: "16px 18px",
+                borderBottom: "1px solid #eef2f7",
+                background: "linear-gradient(180deg, #0f172a 0%, #111827 100%)",
+                color: "white",
+              }}
+            >
+              <div style={{ fontSize: 13, opacity: 0.78, fontWeight: 700 }}>
+                Risico details
+              </div>
+              <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>
+                {selectedRow?.risk.title ?? "Geen risico geselecteerd"}
+              </div>
+            </div>
+
+            {!selectedRow ? (
+              <div style={{ padding: 18, color: "#64748b" }}>
+                Selecteer een risico om details te zien.
+              </div>
+            ) : (
+              (() => {
+                const risk = selectedRow.risk;
+                const linkedPhases = riskPhaseLookup.get(risk.id) ?? [];
+                const owner = selectedRow.owner;
+                const level = normalizeLevel(risk.level, risk.score);
+                const styles = LEVEL_STYLES[level] ?? LEVEL_STYLES.default;
+                const openDays = daysOpen(risk);
+                const { start, end } = deriveRiskRange(risk, linkedPhases);
+
+                return (
+                  <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 18 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <span
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          background: styles.pill,
+                          color: styles.text,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {level === "critical"
+                          ? "Kritiek"
+                          : level === "high"
+                          ? "Hoog"
+                          : level === "medium"
+                          ? "Midden"
+                          : level === "low"
+                          ? "Laag"
+                          : "Standaard"}
+                      </span>
+
+                      <span
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          background: "#eef2ff",
+                          color: "#4338ca",
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {risk.status ?? "Monitoring"}
+                      </span>
+
+                      {risk.category && (
+                        <span
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            background: "#f1f5f9",
+                            color: "#475569",
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {risk.category}
+                        </span>
+                      )}
+                    </div>
+
+                    {risk.description && (
+                      <p
+                        style={{
+                          margin: 0,
+                          color: "#475569",
+                          lineHeight: 1.65,
+                          fontSize: 14,
+                        }}
+                      >
+                        {risk.description}
+                      </p>
+                    )}
+
+                    <div
+                      style={{
+                        border: "1px solid #e8edf3",
+                        borderRadius: 16,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {[
+                        ["Risicoscore", risk.score ?? "—"],
+                        ["Kans", risk.probability ?? "—"],
+                        ["Impact", risk.impact ?? "—"],
+                        ["Start", fmtDate(start)],
+                        ["Einde / review", fmtDate(end)],
+                        ["Open sinds", openDays !== null ? `${openDays} dagen` : "—"],
+                      ].map(([label, value], i) => (
+                        <div
+                          key={label}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            padding: "12px 14px",
+                            borderBottom: i === 5 ? "none" : "1px solid #eef2f7",
+                            fontSize: 13,
+                          }}
+                        >
+                          <span style={{ color: "#64748b" }}>{label}</span>
+                          <span style={{ color: "#0f172a", fontWeight: 700 }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        Eigenaar
+                      </div>
+
+                      {owner ? (
+                        <div
+                          style={{
+                            border: "1px solid #e8edf3",
+                            borderRadius: 16,
+                            padding: 14,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 42,
+                              height: 42,
+                              borderRadius: "50%",
+                              background: "#dbeafe",
+                              color: "#1d4ed8",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {initials(owner.name)}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                              {owner.name}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                              {owner.role ?? owner.organization ?? "Stakeholder"}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            border: "1px dashed #dbe2ea",
+                            borderRadius: 16,
+                            padding: 14,
+                            color: "#64748b",
+                            fontSize: 13,
+                          }}
+                        >
+                          Geen eigenaar gekoppeld.
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        Gekoppelde fases
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {linkedPhases.length ? (
+                          linkedPhases.map((p) => (
+                            <span
+                              key={p.id}
+                              style={{
+                                padding: "7px 10px",
+                                borderRadius: 999,
+                                background: "#f8fafc",
+                                border: "1px solid #e2e8f0",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#334155",
+                              }}
+                            >
+                              {p.title}
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: 13, color: "#64748b" }}>
+                            Geen fasekoppeling gevonden.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          marginBottom: 10,
+                        }}
+                      >
+                        Acties
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {selectedRow.actions.length ? (
+                          selectedRow.actions.map((action) => {
+                            const st = normalizeActionStatus(
+                              action.status,
+                              action.due_date,
+                              action.completed_at
+                            );
+                            const acStyle =
+                              ACTION_STATUS_STYLES[st] ?? ACTION_STATUS_STYLES.default;
+
+                            return (
+                              <div
+                                key={action.id}
+                                style={{
+                                  border: "1px solid #e8edf3",
+                                  borderRadius: 14,
+                                  padding: 12,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      color: "#0f172a",
+                                    }}
+                                  >
+                                    {action.title}
+                                  </div>
+                                  <span
+                                    style={{
+                                      padding: "5px 8px",
+                                      borderRadius: 999,
+                                      background: acStyle.bg,
+                                      color: acStyle.text,
+                                      fontSize: 11,
+                                      fontWeight: 800,
+                                      textTransform: "capitalize",
+                                    }}
+                                  >
+                                    {st === "in_progress"
+                                      ? "Bezig"
+                                      : st === "overdue"
+                                      ? "Verlopen"
+                                      : st === "done"
+                                      ? "Afgerond"
+                                      : "Open"}
+                                  </span>
+                                </div>
+
+                                {action.description && (
+                                  <div
+                                    style={{
+                                      marginTop: 8,
+                                      fontSize: 12,
+                                      color: "#64748b",
+                                      lineHeight: 1.5,
+                                    }}
+                                  >
+                                    {action.description}
+                                  </div>
+                                )}
+
+                                <div
+                                  style={{
+                                    marginTop: 10,
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    fontSize: 12,
+                                    color: "#64748b",
+                                  }}
+                                >
+                                  <span>Deadline</span>
+                                  <span style={{ fontWeight: 700, color: "#334155" }}>
+                                    {fmtDate(action.due_date)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div
+                            style={{
+                              border: "1px dashed #dbe2ea",
+                              borderRadius: 16,
+                              padding: 14,
+                              color: "#64748b",
+                              fontSize: 13,
+                            }}
+                          >
+                            Geen acties gekoppeld aan dit risico.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f8fafc",
+                        border: "1px solid #e8edf3",
+                        borderRadius: 16,
+                        padding: 14,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          marginBottom: 8,
+                        }}
+                      >
+                        AI Insight
+                      </div>
+                      <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}>
+                        {risk.generation_reason
+                          ? risk.generation_reason
+                          : risk.suggested_action
+                          ? `Aanbevolen actie: ${risk.suggested_action}`
+                          : "Nog geen AI-insight opgeslagen voor dit risico."}
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })()
+            )}
           </div>
         </div>
-      )}
-
-      {/* Detail panel for selected event */}
-      {selectedEvent && (
-        <div style={{position:"fixed",right:0,top:0,bottom:0,width:320,background:"white",borderLeft:"1px solid #e8eaf0",boxShadow:"-8px 0 32px rgba(0,0,0,0.08)",zIndex:30,display:"flex",flexDirection:"column"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",borderBottom:"1px solid #f1f5f9"}}>
-            <h3 style={{fontSize:15,fontWeight:700,color:"#0f172a"}}>Event details</h3>
-            <button onClick={()=>setSelectedEvent(null)} style={{height:30,width:30,borderRadius:8,border:"none",background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8"}}><X style={{height:15,width:15}}/></button>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:20}}>
-            {(() => {
-              const tc = TYPE_COLORS[selectedEvent.type] ?? TYPE_COLORS.phase;
-              const sc = STATUS_COLORS[selectedEvent.status] ?? STATUS_COLORS.planned;
-              const owner = stakeholders.find(s => s.id === selectedEvent.owner_stakeholder_id);
-              return (
-                <div style={{display:"flex",flexDirection:"column",gap:16}}>
-                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <span style={{padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:700,background:tc.bg,color:tc.text,border:`1px solid ${tc.border}`}}>{selectedEvent.type}</span>
-                    <span style={{padding:"4px 12px",borderRadius:20,fontSize:12,fontWeight:600,background:sc.bg,color:sc.text}}>{selectedEvent.status.replace("_"," ")}</span>
-                  </div>
-                  <h2 style={{fontSize:20,fontWeight:700,color:"#0f172a",margin:0}}>{selectedEvent.title}</h2>
-                  {selectedEvent.description && <p style={{fontSize:14,color:"#64748b",lineHeight:1.6,margin:0}}>{selectedEvent.description}</p>}
-                  <div style={{background:"#f8fafc",borderRadius:12,padding:14,display:"flex",flexDirection:"column",gap:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:12,color:"#94a3b8"}}>Start</span>
-                      <span style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{fmt(selectedEvent.start_date)}</span>
-                    </div>
-                    {selectedEvent.end_date && (
-                      <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <span style={{fontSize:12,color:"#94a3b8"}}>Einde</span>
-                        <span style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{fmt(selectedEvent.end_date)}</span>
-                      </div>
-                    )}
-                    {selectedEvent.end_date && (
-                      <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <span style={{fontSize:12,color:"#94a3b8"}}>Duur</span>
-                        <span style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{Math.max(0,Math.ceil((new Date(selectedEvent.end_date).getTime()-new Date(selectedEvent.start_date).getTime())/86400000))} dagen</span>
-                      </div>
-                    )}
-                    {owner && (
-                      <div style={{display:"flex",justifyContent:"space-between"}}>
-                        <span style={{fontSize:12,color:"#94a3b8"}}>Verantwoordelijke</span>
-                        <span style={{fontSize:13,fontWeight:600,color:"#1e293b"}}>{owner.name}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {showModal && (
-        <AddEventModal
-          projectId={projectId} stakeholders={stakeholders}
-          onClose={() => setShowModal(false)}
-          onCreated={e => setEvents(prev => [...prev, e].sort((a,b) => a.start_date.localeCompare(b.start_date)))}
-        />
-      )}
+      </div>
     </div>
   );
 }
