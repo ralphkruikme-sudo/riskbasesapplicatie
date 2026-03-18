@@ -1,77 +1,184 @@
-import Link from "next/link";
+"use client";
 
-const contactOptions = [
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { ChevronDown, Headphones, Mail, MessageSquare } from "lucide-react";
+
+const faqs = [
   {
-    title: "Sales",
-    text: "Interested in RiskBases for your team or organization? Get in touch to discuss use cases, workflows and fit.",
+    question: "How do I know whether to choose Sales or Support?",
+    answer:
+      "Choose Sales for questions about pricing, demos, partnerships, or how RiskBases can support your organization. Choose Support if you already use the platform and need help with access, issues, or troubleshooting.",
   },
   {
-    title: "Support",
-    text: "Need help with the platform, onboarding or product questions? We are here to help.",
+    question: "How quickly can I expect a response?",
+    answer:
+      "We aim to respond to most messages within one business day. Urgent support issues are reviewed as quickly as possible.",
   },
   {
-    title: "Partnerships",
-    text: "Want to explore integration, collaboration or implementation opportunities? Let’s connect.",
+    question: "What happens after I submit the form?",
+    answer:
+      "Your request is routed to the appropriate team. We will follow up with the right next steps, whether that is a demo, commercial response, or technical assistance.",
+  },
+  {
+    question: "Do I need to be a customer to contact RiskBases?",
+    answer:
+      "No. You can contact us whether you are exploring the platform, requesting a demo, or already using RiskBases.",
   },
 ];
 
-export default function ContactPage() {
+function FaqItem({
+  question,
+  answer,
+  isOpen,
+  onToggle,
+}: {
+  question: string;
+  answer: string;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <main className="bg-[#f7f8fc] text-slate-950">
-      <section className="px-6 pb-20 pt-16 lg:px-8">
-        <div className="mx-auto max-w-[1180px]">
-          <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
-            <div className="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.05)] md:p-12">
-              <span className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[13px] font-semibold text-violet-700">
-                Contact
-              </span>
+    <div className="border-b border-[#e7e8ee]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-6 py-5 text-left md:py-6"
+      >
+        <span className="pr-6 text-[16px] font-medium leading-7 text-[#111827] md:text-[17px]">
+          {question}
+        </span>
 
-              <h1 className="mt-5 text-[42px] font-bold tracking-[-0.05em] md:text-[60px]">
-                Let’s talk about RiskBases.
-              </h1>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-[#111827] transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
 
-              <p className="mt-6 text-[18px] leading-8 text-slate-500">
-                Whether you want a demo, have product questions or want to
-                explore a collaboration, we would love to hear from you.
-              </p>
+      <div
+        className={`grid transition-all duration-200 ${
+          isOpen ? "grid-rows-[1fr] pb-5" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <p className="max-w-[760px] text-[15px] leading-7 text-[#667085]">
+            {answer}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-              <div className="mt-8 space-y-4 text-[16px] text-slate-600">
-                <p>Email: hello@riskbases.com</p>
-                <p>Response time: typically within 1–2 business days</p>
-                <p>Focus: demo requests, onboarding, partnerships, support</p>
-              </div>
+export default function ContactPage() {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  href="/book-demo"
-                  className="inline-flex h-12 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-indigo-500 px-6 text-[15px] font-semibold text-white"
-                >
-                  Book a demo
-                </Link>
-                <Link
-                  href="mailto:hello@riskbases.com"
-                  className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-[15px] font-semibold text-slate-700"
-                >
-                  Email us
-                </Link>
-              </div>
+  return (
+    <main className="min-h-screen bg-[#f7f7f9]">
+      <section className="mx-auto max-w-[1080px] px-6 pb-14 pt-12 md:px-8 md:pb-16 md:pt-14">
+        <div className="mx-auto max-w-[720px] text-center">
+          <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-[#1f2747] md:text-[48px]">
+            Contact Us
+          </h1>
+
+          <p className="mx-auto mt-4 max-w-[640px] text-[16px] leading-7 text-[#667085] md:text-[18px]">
+            We’re here to help. Reach out with any questions or needs you have.
+          </p>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="rounded-[16px] border border-[#e5e7eb] bg-white p-7">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ebeaf5] bg-[#f7f4ff] text-[#6f4ef6]">
+              <MessageSquare className="h-4 w-4" />
             </div>
 
-            <div className="grid gap-6">
-              {contactOptions.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.04)]"
-                >
-                  <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-slate-900">
-                    {item.title}
-                  </h2>
-                  <p className="mt-3 text-[16px] leading-8 text-slate-600">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
+            <h2 className="mt-5 text-[24px] font-semibold tracking-[-0.03em] text-[#1f2747]">
+              General Inquiries
+            </h2>
+
+            <p className="mt-4 max-w-[460px] text-[16px] leading-8 text-[#667085]">
+              For questions about our services, platform, partnerships, or general information.
+            </p>
+
+            <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-[#e4e7ec] bg-[#fbfbfc] px-4 py-3.5">
+              <Mail className="h-4 w-4 text-[#6f4ef6]" />
+              <span className="text-[15px] text-[#344054]">info@riskbases.com</span>
             </div>
+
+            <div className="mt-4">
+              <Link
+                href="mailto:info@riskbases.com"
+                className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d9dce7] bg-white px-4 text-[14px] font-medium text-[#1f2747] transition hover:bg-[#f8f8fb]"
+              >
+                Email sales
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-[16px] border border-[#e5e7eb] bg-white p-7">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ebeaf5] bg-[#f7f4ff] text-[#6f4ef6]">
+              <Headphones className="h-4 w-4" />
+            </div>
+
+            <h2 className="mt-5 text-[24px] font-semibold tracking-[-0.03em] text-[#1f2747]">
+              Support
+            </h2>
+
+            <p className="mt-4 max-w-[460px] text-[16px] leading-8 text-[#667085]">
+              For technical help, platform issues, or urgent support requests from existing users.
+            </p>
+
+            <div className="mt-6 flex items-center gap-3 rounded-[12px] border border-[#e4e7ec] bg-[#fbfbfc] px-4 py-3.5">
+              <Mail className="h-4 w-4 text-[#6f4ef6]" />
+              <span className="text-[15px] text-[#344054]">support@riskbases.com</span>
+            </div>
+
+            <div className="mt-4">
+              <Link
+                href="mailto:support@riskbases.com"
+                className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#d9dce7] bg-white px-4 text-[14px] font-medium text-[#1f2747] transition hover:bg-[#f8f8fb]"
+              >
+                Contact support
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-hidden rounded-[16px] border border-[#e5e7eb] bg-white">
+          <div className="relative aspect-[16/6] w-full">
+            <Image
+              key="contactus-v2"
+              src="/contactus.png?v=2"
+              alt="RiskBases support team"
+              fill
+              unoptimized
+              priority
+              className="object-cover"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#e7e8ee] bg-[#f7f7f9]">
+        <div className="mx-auto grid max-w-[1080px] grid-cols-1 gap-10 px-6 py-14 md:px-8 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-16">
+          <div>
+            <h3 className="text-[30px] font-medium leading-[1.02] tracking-[-0.04em] text-[#1f2747] md:text-[42px]">
+              Frequently asked questions
+            </h3>
+          </div>
+
+          <div>
+            {faqs.map((faq, index) => (
+              <FaqItem
+                key={faq.question}
+                question={faq.question}
+                answer={faq.answer}
+                isOpen={openIndex === index}
+                onToggle={() => setOpenIndex(openIndex === index ? null : index)}
+              />
+            ))}
           </div>
         </div>
       </section>

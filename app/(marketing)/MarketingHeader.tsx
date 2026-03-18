@@ -164,25 +164,34 @@ function DesktopNavItem({
       onMouseEnter={openMenu}
       onMouseLeave={startCloseTimer}
     >
-      <div className="relative flex h-full items-center">
+      <div className="relative flex h-full items-center gap-1.5">
+        <Link
+          href={item.href}
+          className={`relative inline-flex h-[80px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+            isActive || open ? activeClass : inactiveClass
+          }`}
+        >
+          <span>{item.label}</span>
+          {(isActive || open) && (
+            <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+          )}
+        </Link>
+
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className={`relative inline-flex h-[80px] items-center gap-1.5 text-[15px] font-semibold transition-colors duration-200 ${
+          className={`inline-flex h-[80px] items-center justify-center transition-colors duration-200 ${
             isActive || open ? activeClass : inactiveClass
           }`}
           aria-expanded={open}
           aria-haspopup="menu"
+          aria-label={`Toggle ${item.label} menu`}
         >
-          <span>{item.label}</span>
           <ChevronDown
             className={`h-4 w-4 transition-transform duration-200 ${
               open ? "rotate-180" : ""
             }`}
           />
-          {(isActive || open) && (
-            <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
-          )}
         </button>
       </div>
 
@@ -307,24 +316,35 @@ export default function MarketingHeader() {
                     key={item.label}
                     className="border-b border-slate-100 last:border-b-0"
                   >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMobileDropdownOpen((prev) =>
-                          prev === item.label ? null : item.label
-                        )
-                      }
-                      className={`flex w-full items-center justify-between py-3 text-left text-[15px] font-semibold transition ${
-                        active || isOpen ? "text-violet-700" : "text-slate-800"
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform duration-200 ${
-                          isOpen ? "rotate-180" : ""
+                    <div className="flex items-center justify-between gap-3 py-3">
+                      <Link
+                        href={item.href}
+                        className={`text-[15px] font-semibold transition ${
+                          active ? "text-violet-700" : "text-slate-800"
                         }`}
-                      />
-                    </button>
+                      >
+                        {item.label}
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMobileDropdownOpen((prev) =>
+                            prev === item.label ? null : item.label
+                          )
+                        }
+                        className={`inline-flex items-center justify-center transition ${
+                          active || isOpen ? "text-violet-700" : "text-slate-800"
+                        }`}
+                        aria-label={`Toggle ${item.label} menu`}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform duration-200 ${
+                            isOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
 
                     {isOpen && (
                       <div className="pb-3 pl-3">

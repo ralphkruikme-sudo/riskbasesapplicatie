@@ -1,193 +1,255 @@
 import Link from "next/link";
 import {
-  FileText,
+  Search,
+  ChevronDown,
   BookOpen,
-  Newspaper,
-  Download,
-  ArrowRight,
-  CheckCircle2,
+  FileText,
+  BriefcaseBusiness,
+  FolderKanban,
 } from "lucide-react";
 
-const resources = [
-  {
-    icon: FileText,
-    type: "Guide",
-    title: "How to structure a modern project risk register",
-    description:
-      "A practical framework for setting up a cleaner, more useful and more scalable risk register.",
-    cta: "Read article",
-    href: "/book-demo",
-  },
-  {
-    icon: BookOpen,
-    type: "Best Practice",
-    title: "From Excel to one shared risk platform",
-    description:
-      "Why project teams are moving away from scattered spreadsheets and disconnected reporting.",
-    cta: "Explore topic",
-    href: "/book-demo",
-  },
-  {
-    icon: Newspaper,
-    type: "Insight",
-    title: "What strong risk governance looks like in complex projects",
-    description:
-      "An overview of ownership, actions, escalation and reporting in professional project environments.",
-    cta: "Learn more",
-    href: "/book-demo",
-  },
-  {
-    icon: Download,
-    type: "Template",
-    title: "Risk review checklist for project teams",
-    description:
-      "A practical checklist to support recurring risk reviews, action tracking and decision-making.",
-    cta: "Get template",
-    href: "/book-demo",
-  },
+const documentationLinks = [
+  { label: "Getting Started", href: "/resources/docs/getting-started" },
+  { label: "User Manual", href: "/resources/docs/user-manual" },
+  { label: "API Documentation", href: "/resources/docs/api" },
 ];
 
-const bullets = [
-  "Guides for project and risk teams",
-  "Templates and practical frameworks",
-  "Insights for structured risk governance",
-  "Content focused on real project environments",
+const guideLinks = [
+  { label: "Risk Management 101", href: "/resources/guides/risk-management-101" },
+  { label: "Setting Up a Risk Register", href: "/resources/guides/risk-register-setup" },
+  { label: "Conducting a Risk Assessment", href: "/resources/guides/risk-assessment" },
 ];
+
+const caseStudyLinks = [
+  { label: "Construction", href: "/resources/case-studies/construction" },
+  { label: "Infrastructure", href: "/resources/case-studies/infrastructure" },
+  { label: "Maritime", href: "/resources/case-studies/maritime" },
+];
+
+const templateLinks = [
+  { label: "Risk Register Template", href: "/resources/templates/risk-register-template" },
+  { label: "Risk Review Checklist", href: "/resources/templates/risk-review-checklist" },
+  { label: "Issue Log Template", href: "/resources/templates/issue-log-template" },
+];
+
+function ResourceListCard({
+  icon,
+  title,
+  links,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  links: { label: string; href: string }[];
+}) {
+  return (
+    <div className="rounded-[28px] border border-[#ECE9F7] bg-white p-7 shadow-[0_10px_40px_rgba(41,31,89,0.04)]">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F4F1FF] text-[#6F5AE8]">
+          {icon}
+        </div>
+        <h3 className="text-[19px] font-semibold text-[#1E1B39]">{title}</h3>
+      </div>
+
+      <div className="space-y-3">
+        {links.map((link) => (
+          <Link
+            key={link.label}
+            href={link.href}
+            className="group flex items-start gap-2 text-[17px] text-[#6A6790] transition hover:text-[#4F46E5]"
+          >
+            <span className="mt-[2px] text-[#8C7CF3] transition group-hover:translate-x-0.5">
+              →
+            </span>
+            <span>{link.label}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ResourcesPage() {
   return (
-    <main className="min-h-screen bg-white text-slate-900">
-      <section className="relative overflow-hidden border-b border-slate-200">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.18),transparent_26%),radial-gradient(circle_at_right_center,rgba(168,85,247,0.12),transparent_22%)]" />
-        <div className="mx-auto max-w-7xl px-6 py-20 md:px-8 lg:px-10 lg:py-28">
-          <div className="max-w-3xl">
-            <div className="mb-5 inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-sm font-medium text-violet-700">
-              RiskBases Resources
-            </div>
+    <main className="min-h-screen bg-[#FCFBFF] text-[#1E1B39]">
+      <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-16 md:px-8 lg:px-10 lg:pt-20">
+        <div className="mx-auto max-w-4xl text-center">
+          <h1 className="text-5xl font-semibold tracking-[-0.04em] text-[#3E358A] md:text-6xl">
+            Resources
+          </h1>
+          <p className="mx-auto mt-5 max-w-3xl text-lg text-[#66627F] md:text-[22px]">
+            Insights, guides, templates and case studies for better risk
+            management.
+          </p>
+        </div>
 
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-              Practical resources for stronger project risk management.
-            </h1>
+        <div className="mx-auto mt-10 max-w-5xl rounded-[26px] border border-[#ECE9F7] bg-white p-3 shadow-[0_12px_35px_rgba(41,31,89,0.06)]">
+          <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_2fr]">
+            <button className="flex h-16 items-center justify-between rounded-[18px] border border-[#ECE9F7] px-5 text-left transition hover:bg-[#FAF9FF]">
+              <span className="flex items-center gap-2 text-[18px] font-medium text-[#2B2750]">
+                Industry
+                <ChevronDown className="h-4 w-4 text-[#7D78A3]" />
+              </span>
+              <span className="text-[18px] text-[#7D78A3]">All</span>
+            </button>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              Explore guides, templates and insights designed to help teams
-              improve visibility, governance and control over project risk.
-            </p>
+            <button className="flex h-16 items-center justify-between rounded-[18px] border border-[#ECE9F7] px-5 text-left transition hover:bg-[#FAF9FF]">
+              <span className="flex items-center gap-2 text-[18px] font-medium text-[#2B2750]">
+                Type
+                <ChevronDown className="h-4 w-4 text-[#7D78A3]" />
+              </span>
+              <span className="text-[18px] text-[#7D78A3]">All</span>
+            </button>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/book-demo"
-                className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
-              >
-                Book a demo
-              </Link>
-              <Link
-                href="/features"
-                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-              >
-                View features
-              </Link>
+            <div className="flex h-16 items-center rounded-[18px] border border-[#ECE9F7] px-5">
+              <input
+                type="text"
+                placeholder="Search risk register, reporting, mitigation..."
+                className="w-full bg-transparent text-[16px] text-[#2B2750] outline-none placeholder:text-[#8A87A3]"
+              />
+              <Search className="h-5 w-5 text-[#8A87A3]" />
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-16 md:px-8 lg:px-10 lg:py-20">
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {resources.map((item) => {
-            const Icon = item.icon;
+        <div className="mt-14 grid gap-6 lg:grid-cols-[1.9fr_0.95fr]">
+          <div className="rounded-[34px] border border-[#F0ECFA] bg-[#F8F6FD] p-5 shadow-[0_12px_40px_rgba(41,31,89,0.04)]">
+            <p className="mb-5 text-[14px] font-semibold uppercase tracking-[0.14em] text-[#7B6AE6]">
+              Featured
+            </p>
 
-            return (
-              <div
-                key={item.title}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-                  <Icon className="h-6 w-6" />
+            <div className="rounded-[30px] border border-[#ECE9F7] bg-white p-6 shadow-[0_10px_30px_rgba(71,52,146,0.05)] md:p-8">
+              <div className="grid items-center gap-8 md:grid-cols-[280px_1fr]">
+                <div className="relative flex min-h-[260px] flex-col justify-between overflow-hidden rounded-[24px] border border-[#E9E5FA] bg-[linear-gradient(180deg,#F5F2FF_0%,#E8F0FF_100%)] p-6">
+                  <div className="absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_bottom_left,rgba(112,92,234,0.22),transparent_55%)]" />
+                  <div className="relative">
+                    <div className="mx-auto h-[120px] w-[120px] rounded-[22px] bg-[linear-gradient(135deg,#7A73F8_0%,#6BC1FF_100%)] p-4 shadow-[0_18px_40px_rgba(93,92,235,0.28)]">
+                      <div className="h-full w-full rounded-[16px] bg-white/80 p-3 backdrop-blur">
+                        <div className="mb-2 grid grid-cols-4 gap-1">
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="h-2 rounded bg-[#C9D8FF]"
+                            />
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-4 gap-1">
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="h-3 rounded bg-[#DDE6FF]"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button className="relative inline-flex h-12 items-center justify-center rounded-2xl bg-[linear-gradient(90deg,#6D63F5_0%,#5B8CFF_100%)] px-6 text-[16px] font-medium text-white shadow-[0_12px_25px_rgba(92,99,245,0.28)] transition hover:scale-[1.02]">
+                    Download Template
+                  </button>
                 </div>
 
-                <p className="text-sm font-semibold text-violet-700">
-                  {item.type}
-                </p>
-
-                <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                  {item.title}
-                </h3>
-
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  {item.description}
-                </p>
-
-                <Link
-                  href={item.href}
-                  className="mt-5 inline-flex items-center text-sm font-semibold text-slate-900 transition hover:text-violet-700"
-                >
-                  {item.cta}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="border-y border-slate-200 bg-slate-50">
-        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 md:px-8 lg:grid-cols-2 lg:px-10 lg:py-20">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">
-              What you can expect
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Useful content for real teams and real projects.
-            </h2>
-            <p className="mt-5 max-w-xl text-base leading-8 text-slate-600">
-              The Resources section is meant to support project teams with
-              practical content instead of vague theory.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {bullets.map((item) => (
-              <div
-                key={item}
-                className="rounded-2xl border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-violet-600" />
-                  <p className="text-sm font-medium leading-6 text-slate-700">
-                    {item}
+                <div className="max-w-xl">
+                  <p className="text-[15px] font-semibold uppercase tracking-[0.12em] text-[#8A78EE]">
+                    Featured
+                  </p>
+                  <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[#1F1A3D] md:text-[44px] md:leading-[1.08]">
+                    Risk Register Template
+                  </h2>
+                  <p className="mt-5 max-w-lg text-[20px] leading-8 text-[#5F5A7B]">
+                    Download a structured template to capture, score and track
+                    project risks.
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-16 md:px-8 lg:px-10 lg:py-24">
-        <div className="rounded-[32px] border border-slate-200 bg-slate-950 px-8 py-10 text-white md:px-12 md:py-14">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-300">
-              Want a guided walkthrough?
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              See how RiskBases supports your risk process end-to-end.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
-              Book a demo and we’ll show how teams can centralize risks,
-              coordinate actions and improve reporting.
-            </p>
-
-            <div className="mt-8">
-              <Link
-                href="/book-demo"
-                className="inline-flex items-center justify-center rounded-xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-400"
-              >
-                Book a demo
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
             </div>
           </div>
+
+          <aside className="rounded-[34px] border border-[#F0ECFA] bg-[#F8F6FD] p-5 shadow-[0_12px_40px_rgba(41,31,89,0.04)]">
+            <p className="mb-5 text-[14px] font-semibold uppercase tracking-[0.14em] text-[#7B6AE6]">
+              Spotlight
+            </p>
+
+            <div className="space-y-4">
+              <Link
+                href="/resources/case-studies/construction"
+                className="block rounded-[26px] border border-[#ECE9F7] bg-white p-4 shadow-[0_8px_24px_rgba(41,31,89,0.04)] transition hover:-translate-y-0.5"
+              >
+                <div className="grid grid-cols-[110px_1fr] gap-4">
+                  <div className="relative overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,#EEE9FF_0%,#F8F6FF_100%)]">
+                    <div className="absolute left-2 top-2 rounded-xl bg-[#8C79F8] px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-white">
+                      Case Study
+                    </div>
+                    <div className="flex h-full min-h-[110px] items-end justify-center p-3">
+                      <div className="h-16 w-16 rounded-full bg-[#D9E5FF]" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[17px] font-semibold leading-6 text-[#1F1A3D]">
+                      Construction Case Study
+                    </h3>
+                    <p className="mt-2 text-[15px] leading-6 text-[#66627F]">
+                      How Leighton Contractors reduced onsite risk by 40%.
+                    </p>
+                    <p className="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#8A87A3]">
+                      Success Story · 3 min read
+                    </p>
+                  </div>
+                </div>
+              </Link>
+
+              <Link
+                href="/resources/docs/getting-started"
+                className="block rounded-[26px] border border-[#ECE9F7] bg-white p-4 shadow-[0_8px_24px_rgba(41,31,89,0.04)] transition hover:-translate-y-0.5"
+              >
+                <div className="grid grid-cols-[110px_1fr] gap-4">
+                  <div className="relative overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,#EEE9FF_0%,#F8F6FF_100%)]">
+                    <div className="absolute left-2 top-2 rounded-xl bg-[#A08BF9] px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-white">
+                      Docs
+                    </div>
+                    <div className="flex h-full min-h-[110px] items-center justify-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-md">
+                        <BookOpen className="h-8 w-8 text-[#6F5AE8]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[17px] font-semibold leading-6 text-[#1F1A3D]">
+                      Getting Started with RiskBases
+                    </h3>
+                    <p className="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#8A87A3]">
+                      Docs · 5 min read
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          </aside>
+        </div>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <ResourceListCard
+            icon={<BookOpen className="h-5 w-5" />}
+            title="Documentation"
+            links={documentationLinks}
+          />
+          <ResourceListCard
+            icon={<FileText className="h-5 w-5" />}
+            title="Guides"
+            links={guideLinks}
+          />
+          <ResourceListCard
+            icon={<BriefcaseBusiness className="h-5 w-5" />}
+            title="Case Studies"
+            links={caseStudyLinks}
+          />
+          <ResourceListCard
+            icon={<FolderKanban className="h-5 w-5" />}
+            title="Templates"
+            links={templateLinks}
+          />
         </div>
       </section>
     </main>
