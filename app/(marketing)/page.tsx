@@ -7,588 +7,626 @@ import { ArrowRight } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 
 const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 36 },
+  hidden: { opacity: 0, y: 28 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.7, ease: "easeOut" },
+    transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
 const fadeLeft: Variants = {
-  hidden: { opacity: 0, x: -50 },
+  hidden: { opacity: 0, x: -28 },
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.75, ease: "easeOut" },
+    transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
 const fadeRight: Variants = {
-  hidden: { opacity: 0, x: 50 },
+  hidden: { opacity: 0, x: 28 },
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.75, ease: "easeOut" },
+    transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
 const stagger: Variants = {
   hidden: {},
   visible: {
-    transition: { staggerChildren: 0.12 },
+    transition: {
+      staggerChildren: 0.08,
+    },
   },
 };
 
-const featureLine = [
-  "Centralized risk register",
-  "Smart risk analysis",
-  "Action workflow",
-  "Stakeholder alignment",
-  "Automated reporting",
+const marqueeItems = [
+  "Centralized risk workflows",
+  "Clear action ownership",
+  "Stakeholder-ready reporting",
+  "Project visibility",
+  "Live monitoring",
+  "Structured workflows",
+  "Portfolio control",
+  "Risk identification",
 ];
 
-const problemItems = [
-  "Risks, actions and decisions are spread across too many files and tools.",
-  "Teams struggle to see what is open, overdue or most important right now.",
-  "Ownership gets lost and mitigation actions slip through over time.",
+const valueCards = [
+  {
+    title: "One clear system",
+    text: "Bring risks, actions, stakeholders and reporting together in one structured environment.",
+  },
+  {
+    title: "Better oversight",
+    text: "Keep project teams aligned with clearer ownership, cleaner follow-up and less fragmentation.",
+  },
+  {
+    title: "Real control",
+    text: "See critical risks, overdue actions and project movement before issues become harder to manage.",
+  },
 ];
 
-const solutionItems = [
-  "One source of truth for risks and actions.",
-  "Clear ownership across teams and projects.",
-  "Clean reporting for stakeholders and management.",
-  "Better visibility across the full project lifecycle.",
-];
-
-const steps = [
+const industries = [
   {
     number: "01",
-    title: "Create a workspace",
-    text: "Set up your workspace and invite your team in minutes.",
+    title: "Construction",
+    text: "Track site risks, contractor issues and delivery concerns in one structured workflow.",
   },
   {
     number: "02",
-    title: "Add and score risks",
-    text: "Structure risks clearly and apply one consistent scoring model.",
+    title: "Infrastructure",
+    text: "Manage long-cycle project risks across stakeholders, phases and decision moments.",
   },
   {
     number: "03",
-    title: "Assign actions",
-    text: "Turn risks into clear ownership, deadlines and follow-up.",
+    title: "Maritime & offshore",
+    text: "Keep operational, technical and compliance risk visible across complex projects.",
   },
   {
     number: "04",
-    title: "Report and improve",
-    text: "Track progress and generate updates for every stakeholder.",
+    title: "Manufacturing",
+    text: "Standardize risk workflows across facilities, teams and improvement programs.",
   },
 ];
 
-const fieldItems = [
-  "Capture risks earlier in the project lifecycle.",
-  "Improve coordination between project stakeholders.",
-  "Reduce delays in follow-up and reporting.",
+const workflowSteps = [
+  {
+    step: "01",
+    title: "Create your workspace",
+    text: "Start with a structured environment for teams, projects and risk management flows.",
+  },
+  {
+    step: "02",
+    title: "Capture the risks",
+    text: "Register risks consistently with categories, scoring and project context.",
+  },
+  {
+    step: "03",
+    title: "Assign actions",
+    text: "Turn risk into execution with owners, deadlines and visible accountability.",
+  },
+  {
+    step: "04",
+    title: "Monitor and report",
+    text: "Track movement, follow-up and status with cleaner reporting for stakeholders.",
+  },
 ];
 
-const collaborationItems = [
-  "One live overview across projects.",
-  "Clear accountability for every action.",
-  "Stronger collaboration between office and site.",
+const metrics = [
+  { value: "1", label: "central platform for risks, actions and reporting" },
+  { value: "24/7", label: "visibility across project status and follow-up" },
+  { value: "100%", label: "clearer ownership across teams and stakeholders" },
 ];
+
+function PrimaryButton({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center rounded-full bg-black px-6 py-3 text-[15px] font-semibold text-white transition duration-200 hover:-translate-y-[1px] hover:bg-neutral-800"
+    >
+      {children}
+      <ArrowRight className="ml-2 h-4 w-4" />
+    </Link>
+  );
+}
+
+function SecondaryButton({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center rounded-full border border-black/15 bg-white px-6 py-3 text-[15px] font-semibold text-black transition duration-200 hover:border-black"
+    >
+      {children}
+    </Link>
+  );
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[16px] font-semibold tracking-[-0.02em] text-black">
+    <div className="text-[12px] font-semibold uppercase tracking-[0.22em] text-black">
       {children}
     </div>
   );
 }
 
+function MarqueeRow() {
+  const items = [...marqueeItems, ...marqueeItems, ...marqueeItems];
+
+  return (
+    <div className="relative w-full overflow-hidden border-y border-black/10 bg-[#ececec] py-4">
+      <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-24 bg-gradient-to-r from-[#ececec] to-transparent" />
+      <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-24 bg-gradient-to-l from-[#ececec] to-transparent" />
+
+      <div className="marquee-track flex w-max min-w-full items-center gap-0">
+        {items.map((item, index) => (
+          <div
+            key={`${item}-${index}`}
+            className="flex shrink-0 items-center gap-4 whitespace-nowrap px-6"
+          >
+            <span className="text-[15px] font-medium text-black">{item}</span>
+            <span className="h-[5px] w-[5px] rounded-full bg-black" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HeroOrb() {
+  return (
+    <div className="relative h-[180px] w-[180px] sm:h-[220px] sm:w-[220px]">
+      <motion.div
+        animate={{
+          scale: [1, 1.06, 1],
+          opacity: [0.2, 0.35, 0.2],
+        }}
+        transition={{
+          duration: 7,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-[-20px] rounded-full bg-[#6f5bff]/30 blur-[45px]"
+      />
+      <motion.div
+        animate={{
+          y: [0, -10, 0, 10, 0],
+          rotate: [0, 6, 0, -6, 0],
+        }}
+        transition={{
+          duration: 10,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-0 rounded-[34px] bg-[linear-gradient(135deg,#9b8cff_0%,#6f5bff_50%,#4d36ff_100%)] shadow-[0_32px_90px_rgba(111,91,255,0.42)]"
+      >
+        <div className="absolute inset-0 rounded-[34px] opacity-35 [background-image:radial-gradient(rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:12px_12px]" />
+        <div className="absolute left-4 top-4 h-2.5 w-2.5 rounded-full bg-white/80" />
+        <div className="absolute right-5 top-6 h-2 w-2 rounded-full bg-white/70" />
+        <div className="absolute bottom-5 left-5 h-2 w-2 rounded-full bg-white/70" />
+      </motion.div>
+    </div>
+  );
+}
+
+function FloatingMiniShape() {
+  return (
+    <div className="relative h-[150px] w-[150px] md:h-[180px] md:w-[180px]">
+      <motion.div
+        animate={{
+          y: [0, -8, 0, 8, 0],
+          rotate: [0, -7, 0, 7, 0],
+        }}
+        transition={{
+          duration: 9,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-0 rounded-[30px] bg-[linear-gradient(135deg,#8f7bff_0%,#6f5bff_50%,#4d36ff_100%)] shadow-[0_24px_70px_rgba(111,91,255,0.35)]"
+      >
+        <div className="absolute inset-0 rounded-[30px] opacity-40 [background-image:radial-gradient(rgba(255,255,255,0.45)_1px,transparent_1px)] [background-size:12px_12px]" />
+      </motion.div>
+    </div>
+  );
+}
+
+function InfoCard({
+  title,
+  text,
+}: {
+  title: string;
+  text: string;
+}) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      className="rounded-[28px] border border-black/10 bg-white p-7 shadow-[0_24px_70px_rgba(0,0,0,0.04)]"
+    >
+      <h3 className="text-[24px] font-semibold tracking-[-0.04em] text-black">
+        {title}
+      </h3>
+      <p className="mt-4 text-[18px] leading-8 text-black">{text}</p>
+    </motion.div>
+  );
+}
+
+function TiltImageCard({
+  src,
+  alt,
+  priority = false,
+  className = "",
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+      className={`overflow-hidden rounded-[30px] border border-black/10 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.06)] ${className}`}
+    >
+      <Image
+        src={src}
+        alt={alt}
+        width={1800}
+        height={1200}
+        priority={priority}
+        className="h-auto w-full object-cover"
+      />
+    </motion.div>
+  );
+}
+
 function DotList({ items }: { items: string[] }) {
   return (
-    <div className="mt-10 space-y-5">
+    <div className="mt-8 space-y-4">
       {items.map((item) => (
         <div
           key={item}
-          className="flex items-start gap-4 border-t border-black/10 pt-5"
+          className="flex items-start gap-4 border-t border-black/10 pt-4"
         >
-          <div className="mt-[11px] h-2 w-2 rounded-full bg-black" />
-          <p className="text-[20px] leading-9 text-black">{item}</p>
+          <div className="mt-[10px] h-[7px] w-[7px] rounded-full bg-black" />
+          <p className="text-[18px] leading-8 text-black">{item}</p>
         </div>
       ))}
     </div>
   );
 }
 
-
-function BrainCard() {
+export default function HomePage() {
   return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: "1179/610", background: "#f6f7fb", borderRadius: 0 }}>
-      <style>{`
-        @keyframes brainPulse {
-          0%,100% { transform: scale(1);     opacity: 0.82; }
-          12%     { transform: scale(1.07);  opacity: 1;    }
-          22%     { transform: scale(0.974); opacity: 0.88; }
-          34%     { transform: scale(1.038); opacity: 0.95; }
-          50%     { transform: scale(1);     opacity: 0.82; }
+    <main className="bg-[#ececec] text-black">
+      <style jsx global>{`
+        .marquee-track {
+          animation: marqueeMove 34s linear infinite;
+          will-change: transform;
         }
-        @keyframes pulseRing {
-          0%   { transform: scale(0.85); opacity: 0.8; }
-          100% { transform: scale(1.6);  opacity: 0;   }
-        }
-        @keyframes rayFlow {
-          0%   { stroke-dashoffset: 180; opacity: 0;   }
-          15%  { opacity: 0.85; }
-          85%  { opacity: 0.85; }
-          100% { stroke-dashoffset: -180; opacity: 0;  }
-        }
-        @keyframes rayFlash {
-          0%,100% { opacity: 0.35; }
-          12%     { opacity: 1.0;  }
-          22%     { opacity: 0.45; }
-          34%     { opacity: 0.85; }
-          50%     { opacity: 0.35; }
+
+        @keyframes marqueeMove {
+          0% {
+            transform: translate3d(0, 0, 0);
+          }
+          100% {
+            transform: translate3d(-33.333%, 0, 0);
+          }
         }
       `}</style>
 
-      {/* PNG — multiply blends its white bg away */}
-      <img
-        src="/integraties_cropped.png"
-        alt="RiskBases AI Engine"
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "relative", zIndex: 1 }}
-      />
-
-      {/* SVG overlay */}
-      <svg viewBox="0 0 1179 610"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", overflow: "visible" }}>
-        <defs>
-          <radialGradient id="bc1" cx="50%" cy="48%" r="52%">
-            <stop offset="0%"   stopColor="#b8a4ff" stopOpacity="0.9"/>
-            <stop offset="40%"  stopColor="#7c5cfc" stopOpacity="0.55"/>
-            <stop offset="100%" stopColor="#5b3de8" stopOpacity="0"/>
-          </radialGradient>
-          <radialGradient id="bc2" cx="42%" cy="38%" r="45%">
-            <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.65"/>
-            <stop offset="60%"  stopColor="#d4c8ff" stopOpacity="0.18"/>
-            <stop offset="100%" stopColor="#9b8aff" stopOpacity="0"/>
-          </radialGradient>
-          {/* Ray gradient: bright near brain, fades to icon */}
-          <linearGradient id="rl" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stopColor="#a78bff" stopOpacity="0"/>
-            <stop offset="30%"  stopColor="#c4b5ff" stopOpacity="0.95"/>
-            <stop offset="70%"  stopColor="#a78bff" stopOpacity="0.7"/>
-            <stop offset="100%" stopColor="#7c5cfc" stopOpacity="0.15"/>
-          </linearGradient>
-          <linearGradient id="rr" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%"   stopColor="#a78bff" stopOpacity="0"/>
-            <stop offset="30%"  stopColor="#c4b5ff" stopOpacity="0.95"/>
-            <stop offset="70%"  stopColor="#a78bff" stopOpacity="0.7"/>
-            <stop offset="100%" stopColor="#7c5cfc" stopOpacity="0.15"/>
-          </linearGradient>
-        </defs>
-
-        {/* Pulse rings from brain center (615, 390) */}
-        {[0, 0.55, 1.10].map((d, i) => (
-          <circle key={i} cx="590" cy="320" r="92" fill="none"
-            stroke="#b8a4ff" strokeWidth="1.4"
-            style={{ transformOrigin:"590px 320px", animation:`pulseRing 2.0s ease-out ${d}s infinite`, opacity:0 }}
-          />
-        ))}
-
-        {/* LEFT rays: brain → icons (Project data, Cost data, Schedule, Weather, Supply chain) */}
-        {/* Each ray: x1=brain edge (~520), y1=brain, x2=icon, y2=icon */}
-        {[
-          { x1:500, y1:220, x2:220, y2:100, delay:"0.0s" },  // Project data
-          { x1:494, y1:270, x2:198, y2:188, delay:"0.25s" }, // Cost data
-          { x1:490, y1:318, x2:194, y2:275, delay:"0.5s" },  // Schedule
-          { x1:494, y1:365, x2:198, y2:368, delay:"0.75s" }, // Weather
-          { x1:500, y1:406, x2:220, y2:455, delay:"1.0s" },  // Supply chain
-        ].map((r, i) => (
-          <line key={i} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2}
-            stroke="url(#rl)" strokeWidth="1.4"
-            strokeDasharray="160 280"
-            style={{ animation:`rayFlow 2.0s linear ${r.delay} infinite`, opacity:0 }}
-          />
-        ))}
-
-        {/* RIGHT rays: brain → icons (Risk score, AI insights, Monte Carlo, Scenario, Alerts) */}
-        {[
-          { x1:685, y1:220, x2:958, y2:100, delay:"0.12s" },  // Risk score
-          { x1:688, y1:270, x2:978, y2:188, delay:"0.37s" }, // AI insights
-          { x1:692, y1:318, x2:982, y2:275, delay:"0.62s" }, // Monte Carlo
-          { x1:688, y1:365, x2:978, y2:368, delay:"0.87s" }, // Scenario
-          { x1:682, y1:406, x2:960, y2:455, delay:"1.12s" },  // Alerts
-        ].map((r, i) => (
-          <line key={i} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2}
-            stroke="url(#rr)" strokeWidth="1.4"
-            strokeDasharray="160 280"
-            style={{ animation:`rayFlow 2.0s linear ${r.delay} infinite`, opacity:0 }}
-          />
-        ))}
-
-        {/* Brain glow — pulses with heartbeat */}
-        <ellipse cx="590" cy="320" rx="148" ry="160"
-          fill="url(#bc1)"
-          style={{ transformOrigin:"590px 320px", animation:"brainPulse 2.0s ease-in-out infinite" }}
-        />
-        <ellipse cx="585" cy="302" rx="88" ry="100"
-          fill="url(#bc2)"
-          style={{ transformOrigin:"585px 302px", animation:"brainPulse 2.0s ease-in-out infinite" }}
-        />
-      </svg>
-    </div>
-  );
-}
-
-
-function HeroRibbon() {
-  const svgRef = React.useRef<SVGSVGElement>(null);
-  const animRef = React.useRef<number>(0);
-
-  React.useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-
-    // W=320 is the container width, H=900 covers hero + some below
-    const W = 320, H = 900, N = 120;
-    let t = 0;
-
-    const groups: { fill: SVGPathElement; sheen: SVGPathElement }[] = [];
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-
-    // Main ribbon gradient - deep purple to lavender
-    const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    grad.setAttribute("id", "rg2");
-    grad.setAttribute("x1", "0"); grad.setAttribute("y1", "0");
-    grad.setAttribute("x2", "0"); grad.setAttribute("y2", "1");
-    [
-      [0,    "rgba(255,255,255,0)"],
-      [0.04, "rgba(90,70,255,0.18)"],
-      [0.12, "rgba(58,40,255,1.0)"],
-      [0.24, "rgba(195,185,255,0.95)"],
-      [0.36, "rgba(50,32,255,1.0)"],
-      [0.48, "rgba(191,181,255,0.96)"],
-      [0.60, "rgba(55,37,255,1.0)"],
-      [0.72, "rgba(188,178,255,0.95)"],
-      [0.84, "rgba(60,42,255,0.98)"],
-      [0.93, "rgba(130,115,255,0.20)"],
-      [1,    "rgba(255,255,255,0)"],
-    ].forEach(([o, c]) => {
-      const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-      s.setAttribute("offset", (o as number * 100) + "%");
-      s.setAttribute("stop-color", c as string);
-      grad.appendChild(s);
-    });
-    defs.appendChild(grad);
-
-    // Sheen
-    const sg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    sg.setAttribute("id", "sg2");
-    sg.setAttribute("x1", "0"); sg.setAttribute("y1", "0");
-    sg.setAttribute("x2", "0"); sg.setAttribute("y2", "1");
-    [
-      [0,    "rgba(255,255,255,0)"],
-      [0.10, "rgba(255,255,255,0.92)"],
-      [0.25, "rgba(255,255,255,0.02)"],
-      [0.44, "rgba(255,255,255,0.90)"],
-      [0.60, "rgba(255,255,255,0.02)"],
-      [0.78, "rgba(255,255,255,0.88)"],
-      [1,    "rgba(255,255,255,0)"],
-    ].forEach(([o, c]) => {
-      const s = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-      s.setAttribute("offset", (o as number * 100) + "%");
-      s.setAttribute("stop-color", c as string);
-      sg.appendChild(s);
-    });
-    defs.appendChild(sg);
-
-    // Fade mask: fade in at top, fade out at bottom
-    const mg = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-    mg.setAttribute("id", "mg2");
-    mg.setAttribute("x1","0"); mg.setAttribute("y1","0");
-    mg.setAttribute("x2","0"); mg.setAttribute("y2","1");
-    [[0,"rgba(0,0,0,0)"],[0.05,"#000"],[0.88,"#000"],[1,"rgba(0,0,0,0)"]].forEach(([o,c])=>{
-      const s = document.createElementNS("http://www.w3.org/2000/svg","stop");
-      s.setAttribute("offset", (parseFloat(o as string)*100)+"%");
-      s.setAttribute("stop-color", c as string);
-      mg.appendChild(s);
-    });
-    defs.appendChild(mg);
-
-    const mask = document.createElementNS("http://www.w3.org/2000/svg","mask");
-    mask.setAttribute("id","fm2");
-    const mr = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    mr.setAttribute("x","-200"); mr.setAttribute("width", "600"); mr.setAttribute("height", String(H));
-    mr.setAttribute("fill","url(#mg2)");
-    mask.appendChild(mr);
-    defs.appendChild(mask);
-    svg.appendChild(defs);
-
-    const g = document.createElementNS("http://www.w3.org/2000/svg","g");
-    g.setAttribute("mask","url(#fm2)");
-    svg.appendChild(g);
-
-    // 3 ribbons — narrower halfwidths: 52, 38, 28
-    const configs = [
-      { hw: 52, wave: 0.10, phase: 0,   sheenHw: 11 },
-      { hw: 38, wave: 0.10, phase: 1.1, sheenHw: 8  },
-      { hw: 28, wave: 0.10, phase: 2.3, sheenHw: 6  },
-    ];
-
-    configs.forEach(() => {
-      const fill = document.createElementNS("http://www.w3.org/2000/svg","path");
-      fill.setAttribute("fill","url(#rg2)");
-      g.appendChild(fill);
-      const sheen = document.createElementNS("http://www.w3.org/2000/svg","path");
-      sheen.setAttribute("fill","url(#sg2)");
-      sheen.setAttribute("opacity","0.75");
-      g.appendChild(sheen);
-      groups.push({ fill, sheen });
-    });
-
-    const buildPath = (hw: number, wave: number, phase: number, sheenHw: number): [string, string] => {
-      const spine = Array.from({length: N+1}, (_, i) => {
-        const n = i / N;
-        // Diagonal: start right of center at top (x≈260), drift left to x≈40 at bottom
-        const diag = W * (0.82 - n * 0.75);
-        const w = Math.sin(n * Math.PI * 2.4 + t * 0.25 + phase) * W * wave;
-        return { x: diag + w, y: n * H };
-      });
-
-      const L: {x:number,y:number}[] = [];
-      const R: {x:number,y:number}[] = [];
-      const SH: {x:number,y:number}[] = [];
-
-      for (let i = 0; i <= N; i++) {
-        const a = spine[Math.max(0,i-1)], b = spine[Math.min(N,i+1)];
-        const dx = b.x-a.x, dy = b.y-a.y;
-        const len = Math.sqrt(dx*dx+dy*dy)||1;
-        const nx = -dy/len, ny = dx/len;
-        L.push({x: spine[i].x + nx*hw,      y: spine[i].y + ny*hw});
-        R.push({x: spine[i].x - nx*hw,      y: spine[i].y - ny*hw});
-        SH.push({x: spine[i].x + nx*sheenHw, y: spine[i].y + ny*sheenHw});
-      }
-
-      const pts2path = (arr:{x:number,y:number}[], start='M') =>
-        arr.map((p,i) => `${i===0?start:'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('');
-
-      return [
-        pts2path(L) + pts2path([...R].reverse(), 'L') + 'Z',
-        pts2path(L) + pts2path([...SH].reverse(), 'L') + 'Z',
-      ];
-    };
-
-    const frame = () => {
-      configs.forEach((cfg, i) => {
-        const [fp, sp] = buildPath(cfg.hw, cfg.wave, cfg.phase, cfg.sheenHw);
-        groups[i].fill.setAttribute('d', fp);
-        groups[i].sheen.setAttribute('d', sp);
-      });
-      t += 0.007;
-      animRef.current = requestAnimationFrame(frame);
-    };
-    animRef.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(animRef.current);
-  }, []);
-
-  return (
-    <svg
-      ref={svgRef}
-      viewBox="0 0 320 900"
-      style={{ width: "100%", height: "100%", overflow: "visible" }}
-      preserveAspectRatio="xMaxYMin meet"
-    />
-  );
-}
-
-
-export default function HomePage() {
-
-  return (
-    <>
-    <main className="bg-[#f6f7fb] text-black" style={{ position: "relative" }}>
-
       {/* HERO */}
-      <section className="bg-white" style={{overflow:"visible"}}>
-
-        <div className="mx-auto max-w-[1560px] px-6 pb-20 pt-20 lg:px-10 lg:pb-24 lg:pt-24">
-          <div className="grid items-center gap-16 lg:grid-cols-[0.82fr_1.18fr]">
-            <motion.div
-              variants={fadeLeft}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="max-w-[620px]"
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 pb-10 pt-20 lg:px-8 lg:pb-14 lg:pt-24">
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            animate="visible"
+            className="mx-auto max-w-[1040px] text-center"
+          >
+            <motion.h1
+              variants={fadeUp}
+              className="mx-auto max-w-[1040px] text-[46px] font-semibold leading-[0.94] tracking-[-0.065em] text-black sm:text-[68px] lg:text-[88px]"
             >
-              <SectionLabel>AI-driven risk management platform</SectionLabel>
+              Risk management
+              <br />
+              for teams that want
+              <br />
+              more clarity and
+              <br />
+              control.
+            </motion.h1>
 
-              <h1 className="mt-6 text-[58px] font-semibold leading-[0.94] tracking-[-0.07em] text-black md:text-[84px]">
-                Take control
-                <br />
-                of risk.
-                <br />
-                Build safer projects.
-              </h1>
+            <motion.p
+              variants={fadeUp}
+              className="mx-auto mt-8 max-w-[780px] text-[20px] leading-9 text-black"
+            >
+              RiskBases helps project teams identify, assess, track and reduce
+              risk in one clean platform. Structured workflows, clear ownership
+              and better visibility from start to finish.
+            </motion.p>
 
-              <p className="mt-8 max-w-[560px] text-[20px] leading-9 text-black">
-                RiskBases helps teams manage risks, actions and stakeholders in
-                one clear workspace. Stay proactive, aligned and always up to
-                date.
-              </p>
-
-              <div className="mt-10 flex flex-wrap items-center gap-4">
-                <Link
-                  href="/book-demo"
-                  className="inline-flex items-center rounded-full bg-[#635bff] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:bg-[#554cf2]"
-                >
-                  Book a demo
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-
-                <Link
-                  href="/features/risk-register"
-                  className="inline-flex items-center rounded-full border border-black/12 px-7 py-3.5 text-[15px] font-semibold text-black transition hover:bg-black/[0.03]"
-                >
-                  Explore features
-                </Link>
-              </div>
-
-              <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] text-black">
-                <span className="font-medium text-black">★★★★★</span>
-                <span>Trusted by growing project teams</span>
-                <span className="hidden h-1 w-1 rounded-full bg-black/20 sm:block" />
-                <span>Structured. Clear. Scalable.</span>
-              </div>
+            <motion.div
+              variants={fadeUp}
+              className="mt-10 flex flex-wrap items-center justify-center gap-4"
+            >
+              <PrimaryButton href="/book-demo">Book a demo</PrimaryButton>
+              <SecondaryButton href="/product">Explore product</SecondaryButton>
             </motion.div>
 
             <motion.div
-              variants={fadeRight}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.15 }}
-              className="relative overflow-visible"
-              style={{ minHeight: "760px" }}
+              variants={fadeUp}
+              className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[15px] font-medium text-black"
             >
-
-              <div className="relative z-10">
-                <div className="ml-auto max-w-[980px] overflow-hidden rounded-[24px] shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
-                  <Image
-                    src="/workspace.png"
-                    alt="RiskBases workspace overview"
-                    width={1600}
-                    height={1000}
-                    className="h-auto w-full object-cover"
-                    priority
-                  />
-                </div>
-
-                <div className="-mt-12 ml-12 max-w-[920px] overflow-hidden rounded-[22px] shadow-[0_18px_60px_rgba(15,23,42,0.08)] lg:ml-20">
-                  <Image
-                    src="/project.png"
-                    alt="RiskBases project overview"
-                    width={1500}
-                    height={900}
-                    className="h-auto w-full object-cover"
-                  />
-                </div>
-              </div>
-
+              <span>Centralized risk workflows</span>
+              <span className="h-[5px] w-[5px] rounded-full bg-black" />
+              <span>Clear action ownership</span>
+              <span className="h-[5px] w-[5px] rounded-full bg-black" />
+              <span>Stakeholder-ready reporting</span>
             </motion.div>
-          </div>
-        </div>
-      </section>
+          </motion.div>
 
-      {/* FEATURE LINE */}
-      <section className="bg-[#f6f7fb]">
-        <div className="mx-auto max-w-[1440px] px-6 py-10 lg:px-10">
+          {/* BIG HERO VISUAL DIRECTLY UNDER TEXT */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            className="relative mx-auto mt-14 max-w-[1220px]"
+          >
+            <div className="absolute -left-10 top-[12%] hidden lg:block">
+              <HeroOrb />
+            </div>
+
+            <div className="absolute -right-4 bottom-[10%] hidden lg:block">
+              <FloatingMiniShape />
+            </div>
+
+            <div className="relative overflow-hidden rounded-[38px] border border-black/10 bg-white p-4 shadow-[0_30px_100px_rgba(0,0,0,0.09)] md:p-5">
+              <div className="relative overflow-hidden rounded-[30px]">
+                <Image
+                  src="/home-platform-overview.png"
+                  alt="RiskBases platform overview"
+                  width={2200}
+                  height={1400}
+                  priority
+                  className="h-auto w-full object-cover"
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* SMALL METRICS UNDER HERO VISUAL */}
           <motion.div
             variants={stagger}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            className="grid gap-y-6 border-y border-black/10 py-10 md:grid-cols-2 xl:grid-cols-5"
+            viewport={{ once: true, amount: 0.2 }}
+            className="mx-auto mt-10 grid max-w-[1120px] gap-4 md:grid-cols-3"
           >
-            {featureLine.map((item) => (
+            {metrics.map((metric) => (
               <motion.div
-                key={item}
+                key={metric.label}
                 variants={fadeUp}
-                className="text-[20px] font-semibold tracking-[-0.02em] text-black"
+                className="rounded-[24px] border border-black/10 bg-white px-6 py-6 text-left shadow-[0_18px_50px_rgba(0,0,0,0.04)]"
               >
-                {item}
+                <div className="text-[28px] font-semibold tracking-[-0.04em] text-black">
+                  {metric.value}
+                </div>
+                <p className="mt-2 text-[16px] leading-7 text-black">
+                  {metric.label}
+                </p>
               </motion.div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* PROBLEM / SOLUTION */}
-      <section className="bg-[#f6f7fb]">
-        <div className="mx-auto max-w-[1440px] px-6 py-24 lg:px-10">
-          <div className="grid gap-20 lg:grid-cols-2">
+      <MarqueeRow />
+
+      {/* PHOTO + MESSAGE */}
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 lg:px-8 lg:py-20">
+          <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+            <TiltImageCard
+              src="/fotorisk.png"
+              alt="RiskBases project professional with construction context"
+            />
+
+            <div className="grid gap-5">
+              <TiltImageCard
+                src="/fotorisk2.png"
+                alt="RiskBases office and construction collaboration"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+                className="flex min-h-[220px] flex-col justify-between rounded-[30px] border border-black/10 bg-white p-8 shadow-[0_24px_70px_rgba(0,0,0,0.05)]"
+              >
+                <div>
+                  <SectionLabel>Built for execution</SectionLabel>
+                  <h3 className="mt-4 text-[30px] font-semibold leading-[1.02] tracking-[-0.04em] text-black">
+                    Clear structure for real project environments.
+                  </h3>
+                  <p className="mt-4 text-[18px] leading-8 text-black">
+                    From office teams to site coordination, RiskBases helps keep
+                    risk visible, actionable and easier to manage.
+                  </p>
+                </div>
+
+                <div className="mt-6">
+                  <SecondaryButton href="/about">About us</SecondaryButton>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHY */}
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 lg:px-8 lg:py-20">
+          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
             <motion.div
               variants={fadeLeft}
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, amount: 0.2 }}
-              className="max-w-[620px]"
+              className="max-w-[540px]"
             >
-              <SectionLabel>The challenge</SectionLabel>
-
-              <h2 className="mt-5 text-[56px] font-semibold leading-[1.02] tracking-[-0.06em] text-black md:text-[72px]">
-                Risk management is often still fragmented.
+              <SectionLabel>Why RiskBases</SectionLabel>
+              <h2 className="mt-5 text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-black md:text-[60px]">
+                A simpler and more professional way to manage project risk.
               </h2>
-
-              <p className="mt-7 text-[20px] leading-9 text-black">
-                Many teams still rely on Excel, email and separate documents.
-                That makes it difficult to maintain clarity, ownership and
-                timely follow-up.
-              </p>
-
-              <div className="mt-12 space-y-8">
-                {problemItems.map((item, index) => (
-                  <div key={item} className="border-t border-black/10 pt-6">
-                    <div className="text-[24px] font-semibold tracking-[-0.03em] text-black/20">
-                      0{index + 1}
-                    </div>
-                    <p className="mt-3 max-w-[560px] text-[20px] leading-9 text-black">
-                      {item}
-                    </p>
-                  </div>
-                ))}
-              </div>
             </motion.div>
 
             <motion.div
-              variants={fadeRight}
+              variants={stagger}
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="max-w-[640px]"
+              viewport={{ once: true, amount: 0.15 }}
+              className="grid gap-5 md:grid-cols-3"
             >
-              <SectionLabel>The platform</SectionLabel>
-
-              <h2 className="mt-5 text-[56px] font-semibold leading-[1.02] tracking-[-0.06em] text-black md:text-[72px]">
-                One platform for everything. Always in control.
-              </h2>
-
-              <p className="mt-7 text-[20px] leading-9 text-black">
-                RiskBases brings risks, actions, reporting and accountability
-                together in one structured environment for project teams.
-              </p>
-
-              <DotList items={solutionItems} />
-
-              <div className="mt-12 -mx-6 lg:-mx-0">
-                <BrainCard />
-              </div>
+              {valueCards.map((card) => (
+                <InfoCard key={card.title} title={card.title} text={card.text} />
+              ))}
             </motion.div>
           </div>
         </div>
       </section>
 
+      {/* PLATFORM DETAILS */}
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 lg:px-8 lg:py-20">
+          <div className="grid gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <motion.div
+              variants={fadeLeft}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.2 }}
+              className="max-w-[560px]"
+            >
+              <SectionLabel>The platform</SectionLabel>
+              <h2 className="mt-5 text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-black md:text-[60px]">
+                Designed to feel calm, structured and easy to work with.
+              </h2>
+              <p className="mt-6 text-[20px] leading-9 text-black">
+                RiskBases connects identification, ownership, monitoring and
+                reporting in one environment built for real project execution.
+              </p>
+
+              <DotList items={[
+                "Centralized risk registers across projects and teams.",
+                "Clear ownership with actions, deadlines and accountability.",
+                "Live visibility into status, exposure and overdue follow-up.",
+                "Reporting that feels structured, fast and stakeholder-ready.",
+              ]} />
+
+              <div className="mt-9">
+                <PrimaryButton href="/product">See the product</PrimaryButton>
+              </div>
+            </motion.div>
+
+            <div className="grid gap-5">
+              <motion.div
+                variants={fadeRight}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, amount: 0.2 }}
+                className="rounded-[30px] border border-black/10 bg-white p-6 shadow-[0_24px_70px_rgba(0,0,0,0.06)]"
+              >
+                <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+                  <div>
+                    <SectionLabel>Visibility</SectionLabel>
+                    <h3 className="mt-4 text-[30px] font-semibold leading-[1.02] tracking-[-0.04em] text-black">
+                      Built to make risks and actions easier to follow.
+                    </h3>
+                    <p className="mt-4 text-[18px] leading-8 text-black">
+                      Keep teams aligned with one system for identifying risks,
+                      assigning mitigation and reporting project movement clearly.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-start md:justify-end">
+                    <FloatingMiniShape />
+                  </div>
+                </div>
+              </motion.div>
+
+              <TiltImageCard
+                src="/home-platform-overview.png"
+                alt="RiskBases platform detail"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* INDUSTRIES */}
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 lg:px-8 lg:py-20">
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            className="max-w-[760px]"
+          >
+            <SectionLabel>Industries</SectionLabel>
+            <h2 className="mt-5 text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-black md:text-[60px]">
+              Flexible enough for multiple sectors. Structured enough for real control.
+            </h2>
+          </motion.div>
+
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.15 }}
+            className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4"
+          >
+            {industries.map((item) => (
+              <motion.div
+                key={item.number}
+                variants={fadeUp}
+                className="rounded-[28px] border border-black/10 bg-white p-7 shadow-[0_24px_70px_rgba(0,0,0,0.04)]"
+              >
+                <div className="text-[17px] font-semibold text-black">
+                  {item.number}
+                </div>
+                <h3 className="mt-5 text-[27px] font-semibold tracking-[-0.04em] text-black">
+                  {item.title}
+                </h3>
+                <p className="mt-4 text-[18px] leading-8 text-black">
+                  {item.text}
+                </p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* HOW IT WORKS */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-[1440px] px-6 py-24 lg:px-10">
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 py-16 lg:px-8 lg:py-20">
           <motion.div
             variants={fadeUp}
             initial="hidden"
@@ -597,9 +635,8 @@ export default function HomePage() {
             className="max-w-[760px]"
           >
             <SectionLabel>How it works</SectionLabel>
-
-            <h2 className="mt-5 text-[56px] font-semibold leading-[1.02] tracking-[-0.06em] text-black md:text-[72px]">
-              From risk to action in four steps.
+            <h2 className="mt-5 text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-black md:text-[60px]">
+              A clean flow from first signal to clear action.
             </h2>
           </motion.div>
 
@@ -607,23 +644,23 @@ export default function HomePage() {
             variants={stagger}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
-            className="mt-14 grid gap-10 md:grid-cols-2 xl:grid-cols-4"
+            viewport={{ once: true, amount: 0.15 }}
+            className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4"
           >
-            {steps.map((step) => (
+            {workflowSteps.map((item) => (
               <motion.div
-                key={step.number}
+                key={item.step}
                 variants={fadeUp}
-                className="border-t border-black/10 pt-6"
+                className="rounded-[28px] border border-black/10 bg-white p-7 shadow-[0_24px_70px_rgba(0,0,0,0.04)]"
               >
-                <div className="text-[24px] font-semibold tracking-[-0.03em] text-black/20">
-                  {step.number}
+                <div className="text-[17px] font-semibold text-black">
+                  {item.step}
                 </div>
-                <h3 className="mt-4 text-[28px] font-semibold tracking-[-0.03em] text-black">
-                  {step.title}
+                <h3 className="mt-5 text-[25px] font-semibold tracking-[-0.04em] text-black">
+                  {item.title}
                 </h3>
                 <p className="mt-4 text-[18px] leading-8 text-black">
-                  {step.text}
+                  {item.text}
                 </p>
               </motion.div>
             ))}
@@ -631,139 +668,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* PHOTO 1 */}
-      <section className="bg-[#f6f7fb]">
-        <div className="mx-auto max-w-[1440px] px-6 py-24 lg:px-10">
-          <div className="grid items-center gap-16 lg:grid-cols-[1.02fr_0.98fr]">
-            <motion.div
-              variants={fadeLeft}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="overflow-hidden rounded-[22px] shadow-[0_12px_40px_rgba(15,23,42,0.06)]"
-            >
-              <Image
-                src="/fotorisk.png"
-                alt="Construction team reviewing plans on site"
-                width={1600}
-                height={1100}
-                className="h-[560px] w-full object-cover"
-              />
-            </motion.div>
-
-            <motion.div
-              variants={fadeRight}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="max-w-[560px]"
-            >
-              <SectionLabel>Built for real project environments</SectionLabel>
-
-              <h2 className="mt-5 text-[56px] font-semibold leading-[1.03] tracking-[-0.06em] text-black md:text-[72px]">
-                Created for teams that need clarity on site and in the office.
-              </h2>
-
-              <p className="mt-7 text-[20px] leading-9 text-black">
-                From planning and execution to audits and stakeholder reviews,
-                RiskBases gives teams one clear place to stay aligned.
-              </p>
-
-              <DotList items={fieldItems} />
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* PHOTO 2 */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-[1440px] px-6 py-24 lg:px-10">
-          <div className="grid items-center gap-16 lg:grid-cols-[0.98fr_1.02fr]">
-            <motion.div
-              variants={fadeLeft}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="max-w-[560px]"
-            >
-              <SectionLabel>Collaboration and accountability</SectionLabel>
-
-              <h2 className="mt-5 text-[56px] font-semibold leading-[1.03] tracking-[-0.06em] text-black md:text-[72px]">
-                Better conversations. Better decisions.
-              </h2>
-
-              <p className="mt-7 text-[20px] leading-9 text-black">
-                Keep managers, engineers and stakeholders on the same page with
-                structured actions, visible ownership and clear progress
-                tracking.
-              </p>
-
-              <DotList items={collaborationItems} />
-            </motion.div>
-
-            <motion.div
-              variants={fadeRight}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, amount: 0.2 }}
-              className="overflow-hidden rounded-[22px] shadow-[0_12px_40px_rgba(15,23,42,0.06)]"
-            >
-              <Image
-                src="/fotorisk2.png"
-                alt="Project professionals collaborating with tablet"
-                width={1600}
-                height={1100}
-                className="h-[560px] w-full object-cover"
-              />
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
-      <section className="bg-[#f6f7fb]">
-        <div className="mx-auto max-w-[1440px] px-6 py-24 lg:px-10">
+      <section className="bg-[#ececec]">
+        <div className="mx-auto max-w-[1320px] px-6 pb-24 pt-8 lg:px-8 lg:pb-28">
           <motion.div
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, amount: 0.2 }}
-            className="border-t border-black/10 pt-16 text-center"
+            className="rounded-[34px] border border-black/10 bg-white px-8 py-14 text-center shadow-[0_24px_70px_rgba(0,0,0,0.05)] md:px-14 md:py-18"
           >
-            <div className="mx-auto max-w-[860px]">
-              <h2 className="text-[56px] font-semibold leading-[1.02] tracking-[-0.06em] text-black md:text-[72px]">
-                Ready to take control of your risks?
-              </h2>
+            <SectionLabel>Get started</SectionLabel>
+            <h2 className="mx-auto mt-5 max-w-[900px] text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-black md:text-[64px]">
+              Ready to bring more structure and control to project risk?
+            </h2>
+            <p className="mx-auto mt-6 max-w-[760px] text-[20px] leading-9 text-black">
+              Book a demo and see how RiskBases helps teams move from fragmented
+              risk management to one professional workflow.
+            </p>
 
-              <p className="mx-auto mt-7 max-w-[760px] text-[20px] leading-9 text-black">
-                Book a demo and discover how RiskBases helps teams stay
-                proactive, aligned and always up to date.
-              </p>
-
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-                <Link
-                  href="/book-demo"
-                  className="inline-flex items-center rounded-full bg-[#635bff] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:bg-[#554cf2]"
-                >
-                  Book a demo
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-
-                <Link
-                  href="/auth"
-                  className="inline-flex items-center rounded-full border border-black/12 px-7 py-3.5 text-[15px] font-semibold text-black transition hover:bg-white"
-                >
-                  Start for free
-                </Link>
-              </div>
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+              <PrimaryButton href="/book-demo">Book a demo</PrimaryButton>
+              <SecondaryButton href="/about">About us</SecondaryButton>
             </div>
           </motion.div>
         </div>
       </section>
     </main>
-    <div className="pointer-events-none fixed right-0 top-0 hidden lg:block" style={{ zIndex: 9999, width: 320, height: "100vh" }}>
-      <HeroRibbon />
-    </div>
-    </>
   );
 }

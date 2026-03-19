@@ -20,14 +20,16 @@ type NavItemType = {
 const navItems: NavItemType[] = [
   {
     label: "Product",
-    href: "/",
+    href: "/product",
     dropdown: [
-      { label: "Platform Overview", href: "/" },
-      { label: "Risk Register", href: "/features/risk-register" },
-      { label: "Action Management", href: "/features/actions" },
-      { label: "Stakeholder Management", href: "/features/stakeholders" },
-      { label: "Reports & Dashboards", href: "/features/reports" },
-      { label: "AI Risk Generation", href: "/features/ai" },
+      { label: "Platform Overview", href: "/product" },
+      { label: "Risk Register", href: "/product#risk-register" },
+      { label: "Action Workflow", href: "/product#action-workflow" },
+      { label: "Stakeholder Alignment", href: "/product#stakeholder-alignment" },
+      { label: "Reports & Dashboards", href: "/product#reports-dashboards" },
+      { label: "AI Risk Generation", href: "/product#ai-risk-generation" },
+      { label: "Project Timeline", href: "/product#project-timeline" },
+      { label: "Review & Governance", href: "/product#review-governance" },
     ],
   },
   {
@@ -37,7 +39,7 @@ const navItems: NavItemType[] = [
       { label: "Construction", href: "/solutions#construction" },
       { label: "Infrastructure", href: "/solutions#infrastructure" },
       { label: "Maritime & Offshore", href: "/solutions#maritime" },
-      { label: "Enterprise Teams", href: "/solutions#enterprise" },
+      { label: "Event Management", href: "/solutions#event-management" },
     ],
   },
   {
@@ -49,9 +51,10 @@ const navItems: NavItemType[] = [
     label: "Resources",
     href: "/resources",
     dropdown: [
-      { label: "Documentation", href: "/documentation" },
-      { label: "Case Studies", href: "/case-studies" },
-      { label: "Blog", href: "/blog" },
+      { label: "Documentation", href: "/resources" },
+      { label: "Guides", href: "/resources#guides" },
+      { label: "Case Studies", href: "/resources#case-studies" },
+      { label: "Templates", href: "/resources#templates" },
     ],
   },
   {
@@ -63,7 +66,7 @@ const navItems: NavItemType[] = [
 
 function isItemActive(pathname: string, item: NavItemType) {
   if (item.label === "Product") {
-    return pathname === "/" || pathname.startsWith("/features");
+    return pathname === "/product" || pathname.startsWith("/product/");
   }
 
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -77,22 +80,19 @@ function DropdownMenu({
   closeMenu: () => void;
 }) {
   return (
-    <div className="absolute left-1/2 top-full z-50 w-[320px] -translate-x-1/2 pt-2">
-      <div className="relative overflow-hidden rounded-2xl border border-violet-500/20 bg-white p-2 shadow-[0_24px_70px_rgba(46,49,146,0.14)]">
-        <div className="absolute -top-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-l border-t border-violet-500/20 bg-white" />
-
+    <div className="absolute left-1/2 top-full z-50 w-[340px] -translate-x-1/2 pt-3">
+      <div className="overflow-hidden rounded-[20px] border border-black/10 bg-white p-2 shadow-[0_24px_70px_rgba(0,0,0,0.08)]">
         {items.map((item) => (
           <Link
             key={item.label}
             href={item.href}
             onClick={closeMenu}
-            className="group flex items-center justify-between rounded-xl px-5 py-4 transition duration-200 hover:bg-slate-50"
+            className="group flex items-center justify-between rounded-[14px] px-4 py-3 transition hover:bg-[#f7f8fa]"
           >
-            <span className="text-[15px] font-semibold text-slate-900 transition group-hover:text-violet-600">
+            <span className="text-[15px] font-medium text-black transition group-hover:opacity-70">
               {item.label}
             </span>
-
-            <ArrowRight className="h-4 w-4 shrink-0 text-violet-500/80 transition duration-200 group-hover:translate-x-0.5 group-hover:text-violet-600" />
+            <ArrowRight className="h-4 w-4 text-black/60 transition group-hover:translate-x-0.5 group-hover:text-black" />
           </Link>
         ))}
       </div>
@@ -138,20 +138,20 @@ function DesktopNavItem({
     setOpen(true);
   };
 
-  const activeClass = "text-violet-700";
-  const inactiveClass = "text-slate-700 hover:text-slate-950";
+  const activeClass = "text-black";
+  const inactiveClass = "text-black/70 hover:text-black";
 
   if (!item.dropdown) {
     return (
       <Link
         href={item.href}
-        className={`relative inline-flex h-[80px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+        className={`relative inline-flex h-[76px] items-center text-[15px] font-medium transition-colors duration-200 ${
           isActive ? activeClass : inactiveClass
         }`}
       >
         {item.label}
         {isActive && (
-          <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+          <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-black" />
         )}
       </Link>
     );
@@ -160,27 +160,27 @@ function DesktopNavItem({
   return (
     <div
       ref={ref}
-      className="relative h-[80px]"
+      className="relative h-[76px]"
       onMouseEnter={openMenu}
       onMouseLeave={startCloseTimer}
     >
       <div className="relative flex h-full items-center gap-1.5">
         <Link
           href={item.href}
-          className={`relative inline-flex h-[80px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+          className={`relative inline-flex h-[76px] items-center text-[15px] font-medium transition-colors duration-200 ${
             isActive || open ? activeClass : inactiveClass
           }`}
         >
           <span>{item.label}</span>
           {(isActive || open) && (
-            <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+            <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-black" />
           )}
         </Link>
 
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className={`inline-flex h-[80px] items-center justify-center transition-colors duration-200 ${
+          className={`inline-flex h-[76px] items-center justify-center transition-colors duration-200 ${
             isActive || open ? activeClass : inactiveClass
           }`}
           aria-expanded={open}
@@ -195,12 +195,7 @@ function DesktopNavItem({
         </button>
       </div>
 
-      {open && (
-        <>
-          <div className="absolute left-0 top-full h-3 w-full" />
-          <DropdownMenu items={item.dropdown} closeMenu={() => setOpen(false)} />
-        </>
-      )}
+      {open && <DropdownMenu items={item.dropdown} closeMenu={() => setOpen(false)} />}
     </div>
   );
 }
@@ -218,19 +213,19 @@ export default function MarketingHeader() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
-      <div className="mx-auto flex h-[80px] max-w-[1440px] items-center justify-between px-6 sm:px-8 lg:px-10">
+    <header className="sticky top-0 z-50 border-b border-black/8 bg-white/90 backdrop-blur-md">
+      <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-6 sm:px-8 lg:px-10">
         <div className="flex shrink-0 items-center">
           <Link href="/" className="flex items-center gap-3">
             <Image
               src="/logo-icon.png"
               alt="RiskBases logo"
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
+              width={38}
+              height={38}
+              className="h-9 w-9 object-contain"
               priority
             />
-            <span className="text-[22px] font-bold tracking-[-0.04em] text-slate-950">
+            <span className="text-[22px] font-semibold tracking-[-0.04em] text-black">
               RiskBases
             </span>
           </Link>
@@ -251,28 +246,28 @@ export default function MarketingHeader() {
         <div className="hidden items-center gap-6 lg:flex">
           <Link
             href="/contact"
-            className={`relative inline-flex h-[80px] items-center text-[15px] font-semibold transition-colors duration-200 ${
+            className={`relative inline-flex h-[76px] items-center text-[15px] font-medium transition-colors duration-200 ${
               pathname === "/contact" || pathname.startsWith("/contact/")
-                ? "text-violet-700"
-                : "text-slate-700 hover:text-slate-950"
+                ? "text-black"
+                : "text-black/70 hover:text-black"
             }`}
           >
             Contact Us
             {(pathname === "/contact" || pathname.startsWith("/contact/")) && (
-              <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-violet-600" />
+              <span className="absolute bottom-0 left-1/2 h-[2px] w-full -translate-x-1/2 rounded-full bg-black" />
             )}
           </Link>
 
           <Link
             href="/auth"
-            className="text-[15px] font-semibold text-violet-700 transition hover:text-violet-800"
+            className="text-[15px] font-medium text-black/70 transition hover:text-black"
           >
             Login
           </Link>
 
           <Link
             href="/book-demo"
-            className="inline-flex items-center rounded-full bg-violet-600 px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_30px_rgba(124,58,237,0.20)] transition hover:bg-violet-700"
+            className="inline-flex items-center rounded-full bg-black px-5 py-3 text-[14px] font-semibold text-white transition hover:opacity-90"
           >
             Book a demo
           </Link>
@@ -280,7 +275,7 @@ export default function MarketingHeader() {
 
         <button
           type="button"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-800 lg:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/10 text-black lg:hidden"
           onClick={() => setMobileOpen((prev) => !prev)}
           aria-label="Toggle menu"
           aria-expanded={mobileOpen}
@@ -290,7 +285,7 @@ export default function MarketingHeader() {
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-slate-200 bg-white lg:hidden">
+        <div className="border-t border-black/10 bg-white lg:hidden">
           <div className="mx-auto max-w-[1440px] px-6 py-4 sm:px-8">
             <div className="flex flex-col">
               {navItems.map((item) => {
@@ -302,8 +297,8 @@ export default function MarketingHeader() {
                     <Link
                       key={item.label}
                       href={item.href}
-                      className={`py-3 text-[15px] font-semibold transition ${
-                        active ? "text-violet-700" : "text-slate-800"
+                      className={`py-3 text-[15px] font-medium transition ${
+                        active ? "text-black" : "text-black/75"
                       }`}
                     >
                       {item.label}
@@ -314,13 +309,13 @@ export default function MarketingHeader() {
                 return (
                   <div
                     key={item.label}
-                    className="border-b border-slate-100 last:border-b-0"
+                    className="border-b border-black/6 last:border-b-0"
                   >
                     <div className="flex items-center justify-between gap-3 py-3">
                       <Link
                         href={item.href}
-                        className={`text-[15px] font-semibold transition ${
-                          active ? "text-violet-700" : "text-slate-800"
+                        className={`text-[15px] font-medium transition ${
+                          active ? "text-black" : "text-black/75"
                         }`}
                       >
                         {item.label}
@@ -334,7 +329,7 @@ export default function MarketingHeader() {
                           )
                         }
                         className={`inline-flex items-center justify-center transition ${
-                          active || isOpen ? "text-violet-700" : "text-slate-800"
+                          active || isOpen ? "text-black" : "text-black/75"
                         }`}
                         aria-label={`Toggle ${item.label} menu`}
                       >
@@ -352,7 +347,7 @@ export default function MarketingHeader() {
                           <Link
                             key={subItem.label}
                             href={subItem.href}
-                            className="flex items-center justify-between rounded-xl px-3 py-3 text-[14px] font-medium text-slate-700 transition hover:bg-slate-50 hover:text-violet-600"
+                            className="flex items-center justify-between rounded-[12px] px-3 py-3 text-[14px] font-medium text-black/70 transition hover:bg-[#f7f8fa] hover:text-black"
                           >
                             <span>{subItem.label}</span>
                             <ArrowRight className="h-4 w-4" />
@@ -364,24 +359,24 @@ export default function MarketingHeader() {
                 );
               })}
 
-              <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4">
+              <div className="mt-4 flex flex-col gap-3 border-t border-black/10 pt-4">
                 <Link
                   href="/contact"
-                  className="text-[15px] font-semibold text-slate-800"
+                  className="text-[15px] font-medium text-black"
                 >
                   Contact Us
                 </Link>
 
                 <Link
                   href="/auth"
-                  className="text-[15px] font-semibold text-violet-700"
+                  className="text-[15px] font-medium text-black/75"
                 >
                   Login
                 </Link>
 
                 <Link
                   href="/book-demo"
-                  className="inline-flex w-fit items-center rounded-full bg-violet-600 px-5 py-3 text-[14px] font-semibold text-white shadow-[0_10px_30px_rgba(124,58,237,0.20)] transition hover:bg-violet-700"
+                  className="inline-flex w-fit items-center rounded-full bg-black px-5 py-3 text-[14px] font-semibold text-white transition hover:opacity-90"
                 >
                   Book a demo
                 </Link>
