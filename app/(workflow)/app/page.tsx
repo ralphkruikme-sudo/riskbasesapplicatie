@@ -11,19 +11,20 @@ import {
   Clock3,
   Layers3,
   ChevronRight,
-  ChevronDown,
   Trash2,
   Camera,
   PencilRuler,
   Upload,
   Link2,
-  Users,
   ShieldAlert,
   BadgeCheck,
   RefreshCw,
   Bell,
   CheckCircle2,
   FolderKanban,
+  Shield,
+  Users,
+  ClipboardList,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -207,41 +208,34 @@ function getInsightTone(severity: InsightSeverity) {
     case "critical":
       return {
         badge: "bg-red-50 text-red-700 border border-red-100",
-        iconWrap: "bg-red-50",
         iconColor: "text-red-600",
       };
     case "warning":
       return {
         badge: "bg-amber-50 text-amber-700 border border-amber-100",
-        iconWrap: "bg-amber-50",
         iconColor: "text-amber-600",
       };
     case "positive":
       return {
         badge: "bg-emerald-50 text-emerald-700 border border-emerald-100",
-        iconWrap: "bg-emerald-50",
         iconColor: "text-emerald-600",
       };
     default:
       return {
         badge: "bg-blue-50 text-blue-700 border border-blue-100",
-        iconWrap: "bg-blue-50",
         iconColor: "text-blue-600",
       };
   }
 }
 
-function getInsightIcon(severity: InsightSeverity) {
-  switch (severity) {
-    case "critical":
-      return ShieldAlert;
-    case "warning":
-      return Clock3;
-    case "positive":
-      return BadgeCheck;
-    default:
-      return Users;
-  }
+function getInsightIcon(severity: InsightSeverity, title: string) {
+  const t = title.toLowerCase();
+
+  if (severity === "critical") return ShieldAlert;
+  if (t.includes("team")) return Users;
+  if (t.includes("review")) return ClipboardList;
+  if (severity === "positive") return BadgeCheck;
+  return Shield;
 }
 
 type PType =
@@ -419,7 +413,7 @@ function buildWorkspaceInsights(params: {
     });
   }
 
-  return insights.slice(0, 6);
+  return insights.slice(0, 4);
 }
 
 function Illustration({ type }: { type: PType }) {
@@ -490,59 +484,12 @@ function StatPill({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
-function MemberAvatars({ members }: { members: ProjectMember[] }) {
-  if (!members.length) {
-    return (
-      <div className="text-[12px] font-medium text-slate-400">
-        No members linked
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center -space-x-2">
-      {members.slice(0, 4).map((m) => {
-        const p = m.profiles;
-        const name = p?.full_name ?? "User";
-        const color = AVATAR_COLORS[hashStr(m.user_id) % AVATAR_COLORS.length];
-
-        if (p?.avatar_url) {
-          return (
-            <img
-              key={m.user_id}
-              src={p.avatar_url}
-              alt={name}
-              title={name}
-              className="h-7 w-7 rounded-full border-2 border-white object-cover"
-            />
-          );
-        }
-
-        return (
-          <div
-            key={m.user_id}
-            title={name}
-            className={`flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white ${color}`}
-          >
-            {getInitials(name)}
-          </div>
-        );
-      })}
-      {members.length > 4 && (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-semibold text-slate-600">
-          +{members.length - 4}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function RiskScorePill({ score, level }: { score: number | null; level: string | null }) {
   if (score === null && !level) return null;
   const tone = getRiskStyle(level, score);
 
   return (
-    <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.bg}`}>
+    <div className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${tone.bg}`}>
       <span>Score {score ?? 0}</span>
       <span>{tone.label}</span>
     </div>
@@ -580,7 +527,7 @@ function CardImage({
   }
 
   return (
-    <div className="relative h-40 overflow-hidden" style={{ background: TYPE_BG[type] }}>
+    <div className="relative h-31 overflow-hidden" style={{ background: TYPE_BG[type] }}>
       {project.image_url ? (
         <img src={project.image_url} alt={project.name} className="h-full w-full object-cover" />
       ) : (
@@ -589,13 +536,20 @@ function CardImage({
         </div>
       )}
 
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/10 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/5 via-transparent to-transparent" />
 
-      <div className="absolute right-3 top-3">
+      <div className="absolute left-3 top-3">
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 shadow-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Active
+        </span>
+      </div>
+
+      <div className="absolute right-3 top-3 flex items-center gap-2">
         <button
           type="button"
           onClick={handleCameraClick}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-white/90 shadow-sm transition hover:bg-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/70 bg-white/92 shadow-sm transition hover:bg-white"
           title="Change project cover"
         >
           {uploading ? (
@@ -635,7 +589,6 @@ function ProjectsPageContent() {
   const [activityOnlyMine, setActivityOnlyMine] = useState(false);
   const [activityAutoRefresh, setActivityAutoRefresh] = useState(true);
   const [refreshingPanels, setRefreshingPanels] = useState(false);
-  const [showMoreInsights, setShowMoreInsights] = useState(false);
 
   const activityMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -805,8 +758,8 @@ function ProjectsPageContent() {
           .in("project_id", projectIds)
           .order("created_at", { ascending: false });
 
-        if (ae2) throw ae2;
-        actionsRows = ad2 ?? [];
+          if (ae2) throw ae2;
+          actionsRows = ad2 ?? [];
       } else {
         actionsRows = ad ?? [];
       }
@@ -980,8 +933,6 @@ function ProjectsPageContent() {
     () => projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())),
     [projects, search]
   );
-
-  const visibleInsights = showMoreInsights ? workspaceInsights : workspaceInsights.slice(0, 3);
 
   function getProjectScore(pid: string) {
     const risks = projectRisks[pid] ?? [];
@@ -1167,8 +1118,8 @@ function ProjectsPageContent() {
   return (
     <div className="flex flex-1 overflow-hidden bg-[#f6f8fb]">
       <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="px-8 pb-5 pt-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="px-7 pb-4 pt-7">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <h1 className="text-[34px] font-bold tracking-tight text-slate-900">Projects</h1>
               <p className="mt-1 text-[15px] text-slate-500">
@@ -1187,7 +1138,7 @@ function ProjectsPageContent() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 px-8 pb-5">
+        <div className="flex flex-wrap items-center gap-3 px-7 pb-4">
           <StatPill
             icon={<FolderKanban className="h-4 w-4 text-blue-600" />}
             label={`${projects.length} Active Projects`}
@@ -1206,7 +1157,7 @@ function ProjectsPageContent() {
           />
         </div>
 
-        <div className="px-8 pb-5">
+        <div className="px-7 pb-5">
           <div className="relative max-w-sm">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -1219,16 +1170,16 @@ function ProjectsPageContent() {
         </div>
 
         {message && (
-          <div className="mx-8 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <div className="mx-7 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
             {message}
           </div>
         )}
 
-        <div className="px-8 pb-10">
+        <div className="px-7 pb-10">
           {loading ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-[348px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
+                <div key={i} className="h-[270px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
               ))}
             </div>
           ) : filteredProjects.length === 0 ? (
@@ -1249,113 +1200,95 @@ function ProjectsPageContent() {
               </button>
             </div>
           ) : (
-            <div className="grid max-w-[1220px] grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid max-w-[1080px] grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               {filteredProjects.map((project, index) => {
-                const members = projectMembers[project.id] ?? [];
                 const { score, level } = getProjectScore(project.id);
-                const status = getStatusBadge(project.status);
                 const criticalCount = getProjectCriticalCount(project.id);
                 const moderateCount = getProjectModerateCount(project.id);
 
                 return (
                   <div
                     key={project.id}
-                    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+                    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
                     <div className="relative">
                       <CardImage project={project} onUpload={handleUploadImage} projectIndex={index} />
 
-                      <div className="absolute left-3 top-3">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.pill}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
-                          {status.label}
-                        </span>
-                      </div>
-
                       {criticalCount > 0 && (
-                        <div className="absolute right-14 top-3 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                        <div className="absolute right-13 top-3 rounded-full bg-red-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                           {criticalCount} critical
                         </div>
                       )}
                     </div>
 
                     <div
-                      className="cursor-pointer p-4"
+                      className="cursor-pointer px-4 pb-3 pt-3"
                       onClick={() => openProject(project.id)}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="truncate text-[17px] font-bold leading-tight text-slate-900">
+                          <h3 className="truncate text-[16px] font-bold leading-tight text-slate-900">
                             {project.name}
                           </h3>
-                          <p className="mt-1 text-[12px] text-slate-400">
+                          <p className="mt-1 text-[11px] text-slate-400">
                             Updated {timeAgo(project.updated_at)}
                           </p>
                         </div>
+
                         <RiskScorePill score={score} level={level} />
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                            Open risks
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            Open
                           </div>
                           <div className="mt-1 text-[18px] font-semibold text-slate-900">
                             {project.open_risks_count}
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                            Critical risks
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            Critical
                           </div>
                           <div className="mt-1 text-[18px] font-semibold text-slate-900">
                             {criticalCount}
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                            Moderate risks
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                            Moderate
                           </div>
                           <div className="mt-1 text-[18px] font-semibold text-slate-900">
                             {moderateCount}
                           </div>
                         </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                            Team members
-                          </div>
-                          <div className="mt-1 text-[18px] font-semibold text-slate-900">
-                            {members.length}
-                          </div>
-                        </div>
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between">
-                        <MemberAvatars members={members} />
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="text-[12px] text-slate-500">
+                          Risk level:{" "}
+                          <span className="font-semibold text-slate-800">
+                            {level ? `${level.charAt(0).toUpperCase()}${level.slice(1)}` : "Not available"}
+                          </span>
+                        </div>
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             openProject(project.id);
                           }}
-                          className="inline-flex items-center gap-1 rounded-lg text-[12px] font-semibold text-blue-600 transition hover:text-blue-700"
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 transition hover:text-blue-700"
                         >
-                          Open project
+                          Open
                           <ChevronRight className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-                      <div className="text-[12px] text-slate-500">
-                        Risk level:{" "}
-                        <span className="font-semibold text-slate-800">
-                          {level ? `${level.charAt(0).toUpperCase()}${level.slice(1)}` : "Not available"}
-                        </span>
-                      </div>
-
+                    <div className="flex items-center justify-end border-t border-slate-100 px-4 py-2.5">
                       <button
                         onClick={() => handleDelete(project.id)}
                         disabled={deletingProjectId === project.id}
@@ -1376,7 +1309,7 @@ function ProjectsPageContent() {
       <aside
         className="hidden xl:block"
         style={{
-          width: 336,
+          width: 332,
           flexShrink: 0,
           borderLeft: "1px solid #e2e8f0",
           background: "#f6f8fb",
@@ -1432,9 +1365,7 @@ function ProjectsPageContent() {
                     </button>
 
                     <button
-                      onClick={() => {
-                        setShowActivityMenu(false);
-                      }}
+                      onClick={() => setShowActivityMenu(false)}
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                     >
                       <Bell className="h-4 w-4" />
@@ -1478,78 +1409,70 @@ function ProjectsPageContent() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-blue-600" />
-                <h2 className="text-[14px] font-bold text-slate-900">Risk Insights</h2>
+                <Shield className="h-4 w-4 text-blue-600" />
+                <h2 className="text-[14px] font-bold text-slate-900">RiskBases Insights</h2>
               </div>
 
               <button
                 onClick={refreshWorkspacePanels}
                 className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 transition hover:text-blue-700"
               >
-                <RefreshCw className={`h-3 w-3 ${refreshingPanels ? "animate-spin" : ""}`} />
-                {activityAutoRefresh ? "Auto-refresh on" : "Refresh"}
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshingPanels ? "animate-spin" : ""}`} />
+                Refresh
               </button>
             </div>
 
             <div className="flex flex-col gap-3">
-              {visibleInsights.length === 0 ? (
+              {workspaceInsights.length === 0 ? (
                 <p className="text-xs text-slate-400">
                   No insights yet. Add projects and risks to unlock recommendations.
                 </p>
               ) : (
-                visibleInsights.map((insight) => {
+                workspaceInsights.slice(0, 3).map((insight) => {
                   const tone = getInsightTone(insight.severity);
-                  const Icon = getInsightIcon(insight.severity);
+                  const Icon = getInsightIcon(insight.severity, insight.title);
 
                   return (
-                    <div key={insight.id} className="rounded-xl border border-slate-200 p-3">
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
-                          <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tone.iconWrap}`}>
-                            <Icon className={`h-4 w-4 ${tone.iconColor}`} />
+                    <div key={insight.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 gap-3">
+                          <div className="pt-0.5">
+                            <Icon className={`h-4.5 w-4.5 ${tone.iconColor}`} />
                           </div>
 
-                          <div>
-                            <p className="text-[12px] font-semibold text-slate-900">{insight.title}</p>
-                            <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-slate-900">
+                              {insight.title}
+                            </p>
+                            <p className="mt-1 text-[12px] leading-5 text-slate-600">
                               {insight.description}
                             </p>
+
+                            {insight.projectId && insight.ctaLabel ? (
+                              <button
+                                onClick={() => openProject(insight.projectId)}
+                                className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
+                              >
+                                {insight.ctaLabel}
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null}
                           </div>
                         </div>
 
                         {insight.stat && (
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${tone.badge}`}>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${tone.badge}`}>
                             {insight.stat}
                           </span>
                         )}
                       </div>
-
-                      {insight.projectId && insight.ctaLabel ? (
-                        <button
-                          onClick={() => openProject(insight.projectId)}
-                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-blue-600 hover:text-blue-700"
-                        >
-                          {insight.ctaLabel}
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
-                      ) : null}
                     </div>
                   );
                 })
               )}
             </div>
-
-            {workspaceInsights.length > 3 && (
-              <button
-                onClick={() => setShowMoreInsights((v) => !v)}
-                className="mt-3 flex w-full items-center justify-center gap-1 text-center text-[12px] font-semibold text-slate-500 hover:text-slate-700"
-              >
-                {showMoreInsights ? "Show less" : "Show more"}
-                <ChevronRight className={`h-3.5 w-3.5 transition ${showMoreInsights ? "rotate-90" : ""}`} />
-              </button>
-            )}
           </div>
         </div>
       </aside>

@@ -11,10 +11,10 @@ import {
   CreditCard,
   Download,
   Globe,
-  Hash,
   Home,
   LogOut,
   MessageSquare,
+  MoreHorizontal,
   Paperclip,
   Plus,
   Receipt,
@@ -22,6 +22,7 @@ import {
   Send,
   Settings,
   Shield,
+  Trash2,
   Users,
   X,
   Zap,
@@ -70,6 +71,8 @@ type Conversation = {
   type: "workspace" | "direct" | "group";
   title: string | null;
   created_by: string | null;
+  is_archived: boolean;
+  created_at: string;
   updated_at: string;
 };
 
@@ -80,6 +83,7 @@ type ConversationMember = {
   role: string;
   joined_at: string;
   last_read_at: string | null;
+  muted: boolean;
 };
 
 type ChatMessage = {
@@ -94,6 +98,12 @@ type ChatMessage = {
   updated_at: string;
 };
 
+type DirectConversationItem = Conversation & {
+  otherUserId: string | null;
+  otherName: string;
+  otherAvatar: string | null;
+};
+
 const ROLES = ["owner", "co-owner", "worker"] as const;
 type Role = (typeof ROLES)[number];
 
@@ -102,6 +112,16 @@ const ROLE_COLORS: Record<string, string> = {
   "co-owner": "bg-blue-100 text-blue-700",
   worker: "bg-slate-100 text-slate-600",
 };
+
+function logSupabaseError(label: string, error: any) {
+  console.error(label, {
+    message: error?.message ?? null,
+    code: error?.code ?? null,
+    details: error?.details ?? null,
+    hint: error?.hint ?? null,
+    full: error ?? null,
+  });
+}
 
 function getInitials(name: string | null): string {
   if (!name) return "?";
@@ -194,8 +214,8 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
       subtitle: "For smaller teams getting started with a structured risk workflow",
       features: [
         "Project intake & baseline setup",
-        "Workspace risk collaboration",
-        "Project overview with risk visibility",
+        "Workspace collaboration",
+        "Risk visibility per project",
         "Core team access",
       ],
       badge: null,
@@ -206,9 +226,9 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
       subtitle: "For teams managing project risk in a more structured way",
       features: [
         "Everything in Starter",
-        "Advanced risk workflows",
-        "Stronger team collaboration",
-        "Reporting and broader project control",
+        "Advanced workflows",
+        "Stronger collaboration",
+        "Reporting and broader control",
       ],
       badge: "Most popular",
       highlighted: true,
@@ -219,26 +239,11 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
       features: [
         "Everything in Professional",
         "Custom implementation",
-        "Enterprise support & governance",
+        "Enterprise support",
         "Integrations and scalable rollout",
       ],
       badge: null,
       highlighted: false,
-    },
-  ];
-
-  const reasons = [
-    {
-      title: "What fits your team?",
-      text: "We tailor the setup to your project type, team structure and workflow requirements.",
-    },
-    {
-      title: "Implementation & onboarding",
-      text: "We review setup, project intake, roles and adoption across your organisation.",
-    },
-    {
-      title: "Integrations & custom needs",
-      text: "For larger environments we align on integrations, governance and rollout needs.",
     },
   ];
 
@@ -255,8 +260,7 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
             </h4>
             <p className="mt-2 max-w-[620px] text-sm leading-6 text-slate-600">
               RiskBases is configured around your projects, team structure and desired
-              workflow. That is why we use a sales-led pricing model instead of fixed
-              public pricing.
+              workflow. That is why we use a sales-led pricing model instead of fixed public pricing.
             </p>
           </div>
 
@@ -326,37 +330,6 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
       </div>
 
       <div>
-        <h4 className="mb-4 text-base font-semibold text-slate-800">Why teams book a call</h4>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {reasons.map((item) => (
-            <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-              <p className="mt-2 text-[13px] leading-6 text-slate-500">{item.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-3 text-base font-semibold text-slate-800">Current workspace usage</h4>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {[
-            { label: "Projects", used: 4, max: "Custom" },
-            { label: "Team members", used: 3, max: "Scalable" },
-            { label: "Risks logged", used: 47, max: "Scalable" },
-          ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[11px] uppercase tracking-wide text-slate-400">{item.label}</p>
-              <p className="mt-2 text-[26px] font-bold text-slate-900">
-                {item.used}
-                <span className="ml-2 text-xs font-medium text-slate-400">{item.max}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
         <h4 className="mb-3 text-base font-semibold text-slate-800">Recent invoices</h4>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           {[
@@ -399,8 +372,6 @@ function BillingContent({ onContactSales }: { onContactSales: () => void }) {
 function SettingsContent({ workspace }: { workspace: Workspace | null }) {
   const [workspaceName, setWorkspaceName] = useState(workspace?.name || "");
   const [companyName, setCompanyName] = useState(workspace?.company_name || "");
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [weeklyDigest, setWeeklyDigest] = useState(false);
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -441,73 +412,17 @@ function SettingsContent({ workspace }: { workspace: Workspace | null }) {
 
       <div>
         <div className="mb-4 flex items-center gap-2">
-          <Bell className="h-4 w-4 text-slate-400" />
-          <h4 className="text-base font-semibold text-slate-800">Notifications</h4>
-        </div>
-
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-5">
-          {[
-            {
-              label: "Email notifications",
-              desc: "Receive updates on changes across your workspace",
-              value: emailNotifs,
-              onChange: setEmailNotifs,
-            },
-            {
-              label: "Weekly digest",
-              desc: "Receive a summary of activity every week",
-              value: weeklyDigest,
-              onChange: setWeeklyDigest,
-            },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-800">{item.label}</p>
-                <p className="text-xs text-slate-500">{item.desc}</p>
-              </div>
-
-              <button
-                onClick={() => item.onChange(!item.value)}
-                className={`relative h-6 w-11 rounded-full transition-colors ${
-                  item.value ? "bg-blue-500" : "bg-slate-200"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    item.value ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="mb-4 flex items-center gap-2">
           <Shield className="h-4 w-4 text-slate-400" />
           <h4 className="text-base font-semibold text-slate-800">Security</h4>
         </div>
 
-        <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm text-slate-600">
             SSO, audit controls and advanced governance can be discussed for Enterprise setups.
           </p>
-          <button className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100">
+          <button className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100">
             <Zap className="h-3.5 w-3.5 text-blue-500" />
             Contact sales
-          </button>
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-3 text-base font-semibold text-red-600">Danger zone</h4>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-slate-700">
-            Deleting a workspace is permanent and cannot be undone.
-          </p>
-          <button className="mt-3 inline-flex h-8 items-center rounded-lg border border-red-300 bg-white px-3 text-xs font-semibold text-red-600 transition hover:bg-red-50">
-            Delete workspace
           </button>
         </div>
       </div>
@@ -570,7 +485,6 @@ function NotificationsDropdown({
               <Bell className="h-5 w-5 text-slate-400" />
             </div>
             <p className="mt-3 text-sm font-semibold text-slate-700">No notifications yet</p>
-            <p className="mt-1 text-xs text-slate-400">Everything is quiet for now.</p>
           </div>
         ) : (
           <div className="p-2">
@@ -587,7 +501,7 @@ function NotificationsDropdown({
                   <p className="truncate text-[13px] font-semibold text-slate-800">
                     {item.title || "Notification"}
                   </p>
-                  <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-slate-500">
+                  <p className="mt-0.5 text-[12px] leading-5 text-slate-500">
                     {item.message || "No details available."}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
@@ -633,9 +547,11 @@ function ChatPanel({
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [newGroupTitle, setNewGroupTitle] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [activeMenuOpen, setActiveMenuOpen] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -646,45 +562,164 @@ function ChatPanel({
     return map;
   }, [teamMembers]);
 
-  async function loadConversations() {
+  async function ensureWorkspaceConversation(): Promise<string | null> {
+    const { data: existing, error: existingError } = await supabase
+      .from("chat_conversations")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("type", "workspace")
+      .eq("is_archived", false)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      logSupabaseError("ensureWorkspaceConversation existing error", existingError);
+      return null;
+    }
+
+    if (existing?.id) {
+      const workspaceConversationId = existing.id as string;
+      const { data: existingMembers, error: membersCheckError } = await supabase
+        .from("chat_conversation_members")
+        .select("user_id")
+        .eq("conversation_id", workspaceConversationId);
+
+      if (membersCheckError) {
+        logSupabaseError("ensureWorkspaceConversation check members error", membersCheckError);
+        return workspaceConversationId;
+      }
+
+      const existingMemberIds = new Set((existingMembers || []).map((m: any) => m.user_id));
+      const missingMembers = teamMembers
+        .filter((member) => !existingMemberIds.has(member.user_id))
+        .map((member) => ({
+          conversation_id: workspaceConversationId,
+          user_id: member.user_id,
+          role: member.user_id === currentUserId ? "owner" : "member",
+        }));
+
+      if (missingMembers.length > 0) {
+        const { error: addMissingError } = await supabase
+          .from("chat_conversation_members")
+          .insert(missingMembers);
+
+        if (addMissingError) {
+          logSupabaseError("ensureWorkspaceConversation add missing members error", addMissingError);
+        }
+      }
+
+      return workspaceConversationId;
+    }
+
+    const { data: createdConversation, error: createConversationError } = await supabase
+      .from("chat_conversations")
+      .insert({
+        workspace_id: workspaceId,
+        type: "workspace",
+        title: "Workspace",
+        created_by: currentUserId,
+        is_archived: false,
+      })
+      .select("id")
+      .single();
+
+    if (createConversationError) {
+      logSupabaseError("ensureWorkspaceConversation create conversation error", createConversationError);
+      return null;
+    }
+
+    const conversationId = createdConversation.id as string;
+
+    const membersToInsert = teamMembers.map((m) => ({
+      conversation_id: conversationId,
+      user_id: m.user_id,
+      role: m.user_id === currentUserId ? "owner" : "member",
+    }));
+
+    const { error: membersInsertError } = await supabase
+      .from("chat_conversation_members")
+      .insert(membersToInsert);
+
+    if (membersInsertError) {
+      logSupabaseError("ensureWorkspaceConversation add members error", membersInsertError);
+    }
+
+    return conversationId;
+  }
+
+  async function loadConversations(nextActiveId?: string | null) {
     setLoadingConversations(true);
+
     try {
-      await supabase.rpc("create_workspace_default_chat", {
-        p_workspace_id: workspaceId,
-        p_user_id: currentUserId,
-      });
+      await ensureWorkspaceConversation();
+
+      const { data: membershipRows, error: membershipError } = await supabase
+        .from("chat_conversation_members")
+        .select("conversation_id")
+        .eq("user_id", currentUserId);
+
+      if (membershipError) {
+        logSupabaseError("loadConversations membership rows error", membershipError);
+        return;
+      }
+
+      const memberConversationIds = [...new Set((membershipRows || []).map((row: any) => row.conversation_id))];
+
+      if (memberConversationIds.length === 0) {
+        setConversationMembers([]);
+        setConversations([]);
+        setActiveConversationId(null);
+        return;
+      }
 
       const { data: convData, error: convError } = await supabase
         .from("chat_conversations")
-        .select("id, workspace_id, type, title, created_by, updated_at")
+        .select("id, workspace_id, type, title, created_by, is_archived, created_at, updated_at")
         .eq("workspace_id", workspaceId)
+        .eq("is_archived", false)
+        .in("id", memberConversationIds)
         .order("updated_at", { ascending: false });
 
       if (convError) {
-        console.error(convError);
+        logSupabaseError("loadConversations error", convError);
         return;
       }
 
       const conversationsList = (convData || []) as Conversation[];
-      setConversations(conversationsList);
+      const ids = conversationsList.map((c) => c.id);
 
-      if (conversationsList.length > 0) {
-        const ids = conversationsList.map((c) => c.id);
+      let membersList: ConversationMember[] = [];
 
+      if (ids.length > 0) {
         const { data: membersData, error: membersError } = await supabase
           .from("chat_conversation_members")
-          .select("id, conversation_id, user_id, role, joined_at, last_read_at")
+          .select("id, conversation_id, user_id, role, joined_at, last_read_at, muted")
           .in("conversation_id", ids);
 
-        if (!membersError) {
-          setConversationMembers((membersData || []) as ConversationMember[]);
+        if (membersError) {
+          logSupabaseError("load conversation members error", membersError);
+          return;
         }
 
-        if (!activeConversationId) {
+        membersList = (membersData || []) as ConversationMember[];
+      }
+
+      setConversationMembers(membersList);
+      setConversations(conversationsList);
+
+      if (nextActiveId) {
+        setActiveConversationId(nextActiveId);
+      } else {
+        setActiveConversationId((prev) => {
+          if (prev && conversationsList.some((conversation) => conversation.id === prev)) {
+            return prev;
+          }
           const workspaceConv =
-            conversationsList.find((c) => c.type === "workspace") || conversationsList[0];
-          setActiveConversationId(workspaceConv.id);
-        }
+            conversationsList.find((conversation) => conversation.type === "workspace") ||
+            conversationsList[0] ||
+            null;
+          return workspaceConv?.id || null;
+        });
       }
     } finally {
       setLoadingConversations(false);
@@ -692,9 +727,10 @@ function ChatPanel({
   }
 
   useEffect(() => {
+    if (teamMembers.length === 0) return;
     loadConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]);
+  }, [workspaceId, currentUserId, teamMembers.length]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -711,10 +747,10 @@ function ChatPanel({
         .is("deleted_at", null)
         .order("created_at", { ascending: true });
 
-      if (!error) {
-        setMessages((data || []) as ChatMessage[]);
+      if (error) {
+        logSupabaseError("loadMessages error", error);
       } else {
-        console.error(error);
+        setMessages((data || []) as ChatMessage[]);
       }
 
       setLoadingMessages(false);
@@ -733,7 +769,11 @@ function ChatPanel({
           filter: `conversation_id=eq.${activeConversationId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as ChatMessage]);
+          setMessages((prev) => {
+            const exists = prev.some((message) => message.id === payload.new.id);
+            if (exists) return prev;
+            return [...prev, payload.new as ChatMessage];
+          });
         }
       )
       .subscribe();
@@ -747,46 +787,56 @@ function ChatPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeConversationId]);
 
-  const conversationById = useMemo(() => {
-    const map = new Map<string, Conversation>();
-    for (const c of conversations) map.set(c.id, c);
-    return map;
-  }, [conversations]);
-
   const workspaceConversation = conversations.find((c) => c.type === "workspace") || null;
   const groupConversations = conversations.filter((c) => c.type === "group");
 
-  const directConversations = conversations
-    .filter((c) => c.type === "direct")
-    .map((conv) => {
-      const members = conversationMembers.filter((m) => m.conversation_id === conv.id);
-      const other = members.find((m) => m.user_id !== currentUserId);
-      const otherProfile = other ? teamMap.get(other.user_id) : null;
+  const directConversations: DirectConversationItem[] = useMemo(() => {
+    return conversations
+      .filter((c) => c.type === "direct")
+      .map((conv) => {
+        const members = conversationMembers.filter((m) => m.conversation_id === conv.id);
+        const other = members.find((m) => m.user_id !== currentUserId);
 
-      return {
-        ...conv,
-        otherUserId: other?.user_id || null,
-        otherName: otherProfile?.full_name || "Direct message",
-        otherAvatar: otherProfile?.avatar_url || null,
-        otherRole: otherProfile?.role || null,
-      };
-    })
-    .filter((conv) =>
-      (conv.otherName || "").toLowerCase().includes(search.toLowerCase())
-    );
+        if (!other || members.length < 2) return null;
 
-  const filteredTeamMembers = teamMembers
+        const otherProfile = teamMap.get(other.user_id);
+
+        return {
+          ...conv,
+          otherUserId: other.user_id,
+          otherName: otherProfile?.full_name || "Direct message",
+          otherAvatar: otherProfile?.avatar_url || null,
+        };
+      })
+      .filter(Boolean) as DirectConversationItem[];
+  }, [conversations, conversationMembers, currentUserId, teamMap]);
+
+  const existingDirectUserIds = new Set(
+    directConversations.map((d) => d.otherUserId).filter(Boolean) as string[]
+  );
+
+  const dmSuggestions = teamMembers
     .filter((member) => member.user_id !== currentUserId)
+    .filter((member) => !existingDirectUserIds.has(member.user_id))
     .filter((member) =>
       (member.full_name || "").toLowerCase().includes(search.toLowerCase())
     );
 
-  const activeConversation =
-    activeConversationId ? conversationById.get(activeConversationId) || null : null;
+  const filteredDirectConversations = directConversations.filter((conv) =>
+    (conv.otherName || "").toLowerCase().includes(search.toLowerCase())
+  );
 
+  const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
   const activeConversationMembers = activeConversationId
     ? conversationMembers.filter((m) => m.conversation_id === activeConversationId)
     : [];
+
+  const myConversationRole =
+    activeConversationMembers.find((m) => m.user_id === currentUserId)?.role || null;
+
+  const canManageActiveGroup =
+    activeConversation?.type === "group" &&
+    (myConversationRole === "owner" || myConversationRole === "admin");
 
   const activeDirectOther =
     activeConversation?.type === "direct"
@@ -803,40 +853,163 @@ function ChatPanel({
   }));
 
   async function startDirectMessage(otherUserId: string) {
-    const { data, error } = await supabase.rpc("create_direct_conversation", {
-      p_workspace_id: workspaceId,
-      p_other_user_id: otherUserId,
-    });
-
-    if (error) {
-      console.error(error);
+    const existing = directConversations.find((d) => d.otherUserId === otherUserId);
+    if (existing) {
+      setActiveConversationId(existing.id);
       return;
     }
 
-    await loadConversations();
-    if (data) setActiveConversationId(data as string);
+    const { data: sharedMemberships, error: sharedMembershipsError } = await supabase
+      .from("chat_conversation_members")
+      .select("conversation_id, user_id")
+      .in("user_id", [currentUserId, otherUserId]);
+
+    if (sharedMembershipsError) {
+      logSupabaseError("startDirectMessage shared membership lookup error", sharedMembershipsError);
+      return;
+    }
+
+    const membershipCountByConversation = new Map<string, Set<string>>();
+    for (const row of sharedMemberships || []) {
+      if (!membershipCountByConversation.has(row.conversation_id)) {
+        membershipCountByConversation.set(row.conversation_id, new Set());
+      }
+      membershipCountByConversation.get(row.conversation_id)?.add(row.user_id);
+    }
+
+    const sharedConversationIds = Array.from(membershipCountByConversation.entries())
+      .filter(([, userIds]) => userIds.has(currentUserId) && userIds.has(otherUserId))
+      .map(([conversationId]) => conversationId);
+
+    if (sharedConversationIds.length > 0) {
+      const { data: sharedConversations, error: sharedConversationsError } = await supabase
+        .from("chat_conversations")
+        .select("id, type, workspace_id, is_archived")
+        .eq("workspace_id", workspaceId)
+        .eq("type", "direct")
+        .eq("is_archived", false)
+        .in("id", sharedConversationIds)
+        .limit(1);
+
+      if (sharedConversationsError) {
+        logSupabaseError("startDirectMessage shared conversations lookup error", sharedConversationsError);
+      } else if ((sharedConversations || []).length > 0) {
+        const existingConversationId = sharedConversations?.[0]?.id as string;
+        await loadConversations(existingConversationId);
+        return;
+      }
+    }
+
+    const { data: createdConversation, error: createConversationError } = await supabase
+      .from("chat_conversations")
+      .insert({
+        workspace_id: workspaceId,
+        type: "direct",
+        title: null,
+        created_by: currentUserId,
+        is_archived: false,
+      })
+      .select("id")
+      .single();
+
+    if (createConversationError) {
+      logSupabaseError("startDirectMessage create conversation error", createConversationError);
+      return;
+    }
+
+    const conversationId = createdConversation.id as string;
+
+    const { error: addMembersError } = await supabase
+      .from("chat_conversation_members")
+      .insert([
+        {
+          conversation_id: conversationId,
+          user_id: currentUserId,
+          role: "owner",
+        },
+        {
+          conversation_id: conversationId,
+          user_id: otherUserId,
+          role: "member",
+        },
+      ]);
+
+    if (addMembersError) {
+      logSupabaseError("startDirectMessage add members error", addMembersError);
+      return;
+    }
+
+    await loadConversations(conversationId);
   }
 
   async function createGroupConversation() {
     const title = newGroupTitle.trim();
     if (!title) return;
 
-    const { data, error } = await supabase.rpc("create_group_conversation", {
-      p_workspace_id: workspaceId,
-      p_title: title,
-      p_member_ids: selectedMembers,
-    });
+    const uniqueMemberIds = [...new Set(selectedMembers.filter((userId) => userId !== currentUserId))];
 
-    if (error) {
-      console.error(error);
+    const { data: createdConversation, error: createConversationError } = await supabase
+      .from("chat_conversations")
+      .insert({
+        workspace_id: workspaceId,
+        type: "group",
+        title,
+        created_by: currentUserId,
+        is_archived: false,
+      })
+      .select("id")
+      .single();
+
+    if (createConversationError) {
+      logSupabaseError("createGroupConversation create conversation error", createConversationError);
+      return;
+    }
+
+    const conversationId = createdConversation.id as string;
+
+    const membersToInsert = [
+      {
+        conversation_id: conversationId,
+        user_id: currentUserId,
+        role: "owner",
+      },
+      ...uniqueMemberIds.map((userId) => ({
+        conversation_id: conversationId,
+        user_id: userId,
+        role: "member",
+      })),
+    ];
+
+    const { error: insertMembersError } = await supabase
+      .from("chat_conversation_members")
+      .insert(membersToInsert);
+
+    if (insertMembersError) {
+      logSupabaseError("createGroupConversation add members error", insertMembersError);
       return;
     }
 
     setCreateGroupOpen(false);
     setNewGroupTitle("");
     setSelectedMembers([]);
-    await loadConversations();
-    if (data) setActiveConversationId(data as string);
+    await loadConversations(conversationId);
+  }
+
+  async function archiveActiveGroup() {
+    if (!activeConversation || activeConversation.type !== "group") return;
+
+    const { error } = await supabase
+      .from("chat_conversations")
+      .update({ is_archived: true })
+      .eq("id", activeConversation.id);
+
+    if (error) {
+      logSupabaseError("archiveActiveGroup error", error);
+      return;
+    }
+
+    setActiveMenuOpen(false);
+    await loadConversations(workspaceConversation?.id || null);
   }
 
   async function sendMessage() {
@@ -857,7 +1030,7 @@ function ChatPanel({
       });
 
       if (error) {
-        console.error("Message send error:", error);
+        logSupabaseError("Message send error", error);
       }
     } finally {
       setSending(false);
@@ -871,7 +1044,9 @@ function ChatPanel({
       .eq("id", messageId)
       .eq("user_id", currentUserId);
 
-    if (!error) {
+    if (error) {
+      logSupabaseError("deleteMessage error", error);
+    } else {
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     }
   }
@@ -886,13 +1061,9 @@ function ChatPanel({
   return (
     <div
       className="fixed top-0 bottom-0 z-40 flex overflow-hidden border-r border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.12)]"
-      style={{
-        left: sidebarWidth,
-        width: 430,
-        transition: "left 220ms ease",
-      }}
+      style={{ left: sidebarWidth, width: 430, transition: "left 220ms ease" }}
     >
-      <div className="flex w-[150px] flex-col border-r border-slate-200 bg-slate-50/70">
+      <div className="flex w-[172px] flex-col border-r border-slate-200 bg-slate-50/80">
         <div className="flex h-[72px] items-center justify-between border-b border-slate-200 px-4">
           <div>
             <p className="text-[14px] font-bold text-slate-900">Chat</p>
@@ -918,10 +1089,10 @@ function ChatPanel({
           </div>
         </div>
 
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Channels
+              Workspace
             </p>
             <button
               onClick={() => setCreateGroupOpen(true)}
@@ -937,13 +1108,13 @@ function ChatPanel({
               className={`mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition ${
                 activeConversationId === workspaceConversation.id
                   ? "bg-violet-100 text-violet-700"
-                  : "text-slate-700 hover:bg-white"
+                  : "hover:bg-white"
               }`}
             >
-              <Hash className="h-4 w-4 shrink-0" />
+              <MessageSquare className="h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold">workspace</p>
-                <p className="truncate text-[10px] text-slate-400">All workspace members</p>
+                <p className="truncate text-[13px] font-semibold text-slate-800">Workspace</p>
+                <p className="truncate text-[10px] text-slate-400">General channel</p>
               </div>
             </button>
           )}
@@ -955,12 +1126,14 @@ function ChatPanel({
               className={`mb-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition ${
                 activeConversationId === conv.id
                   ? "bg-violet-100 text-violet-700"
-                  : "text-slate-700 hover:bg-white"
+                  : "hover:bg-white"
               }`}
             >
-              <Hash className="h-4 w-4 shrink-0" />
+              <Users className="h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-semibold">{conv.title || "Group chat"}</p>
+                <p className="truncate text-[13px] font-semibold text-slate-800">
+                  {conv.title || "Group"}
+                </p>
                 <p className="truncate text-[10px] text-slate-400">Custom group</p>
               </div>
             </button>
@@ -973,7 +1146,7 @@ function ChatPanel({
               Direct messages
             </p>
             <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-              {directConversations.length}
+              {filteredDirectConversations.length}
             </span>
           </div>
 
@@ -982,130 +1155,141 @@ function ChatPanel({
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-100" />
               ))
-            ) : directConversations.length > 0 ? (
-              directConversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => setActiveConversationId(conv.id)}
-                  className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${
-                    activeConversationId === conv.id ? "bg-violet-100" : "hover:bg-white"
-                  }`}
-                >
-                  <AvatarCircle
-                    name={conv.otherName}
-                    avatarUrl={conv.otherAvatar}
-                    size="xs"
-                    userId={conv.otherUserId || ""}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] font-medium text-slate-700">
-                      {conv.otherName}
-                    </p>
-                    <p className="truncate text-[10px] text-slate-400">Direct message</p>
-                  </div>
-                </button>
-              ))
             ) : (
-              filteredTeamMembers.map((member) => (
-                <button
-                  key={member.user_id}
-                  onClick={() => startDirectMessage(member.user_id)}
-                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition hover:bg-white"
-                >
-                  <AvatarCircle
-                    name={member.full_name}
-                    avatarUrl={member.avatar_url}
-                    size="xs"
-                    userId={member.user_id}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] font-medium text-slate-700">
-                      {member.full_name || "User"}
-                    </p>
-                    <p className="truncate text-[10px] capitalize text-slate-400">{member.role}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+              <>
+                {filteredDirectConversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => setActiveConversationId(conv.id)}
+                    className={`flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition ${
+                      activeConversationId === conv.id ? "bg-violet-100" : "hover:bg-white"
+                    }`}
+                  >
+                    <AvatarCircle
+                      name={conv.otherName}
+                      avatarUrl={conv.otherAvatar}
+                      size="xs"
+                      userId={conv.otherUserId || ""}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-[12px] font-medium text-slate-700">
+                        {conv.otherName}
+                      </p>
+                      <p className="truncate text-[10px] text-slate-400">Direct message</p>
+                    </div>
+                  </button>
+                ))}
 
-        <div className="border-t border-slate-200 p-3">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Team
-          </p>
-          <div className="space-y-1">
-            {filteredTeamMembers.slice(0, 3).map((member) => (
-              <button
-                key={member.user_id}
-                onClick={() => startDirectMessage(member.user_id)}
-                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-white"
-              >
-                <AvatarCircle
-                  name={member.full_name}
-                  avatarUrl={member.avatar_url}
-                  size="xs"
-                  userId={member.user_id}
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium text-slate-700">
-                    {member.full_name || "User"}
-                  </p>
-                </div>
-              </button>
-            ))}
+                {dmSuggestions.length > 0 && (
+                  <div className="pt-2">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Start new
+                    </p>
+                    {dmSuggestions.map((member) => (
+                      <button
+                        key={member.user_id}
+                        onClick={() => startDirectMessage(member.user_id)}
+                        className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left transition hover:bg-white"
+                      >
+                        <AvatarCircle
+                          name={member.full_name}
+                          avatarUrl={member.avatar_url}
+                          size="xs"
+                          userId={member.user_id}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-[12px] font-medium text-slate-700">
+                            {member.full_name || "User"}
+                          </p>
+                          <p className="truncate text-[10px] capitalize text-slate-400">
+                            {member.role}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col bg-white">
         <div className="flex h-[72px] items-center justify-between border-b border-slate-100 px-5">
-          {activeConversation?.type === "workspace" && (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100">
-                <MessageSquare className="h-5 w-5 text-violet-600" />
-              </div>
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-900"># workspace</h2>
-                <p className="text-[11px] text-slate-400">Open group chat for the whole team</p>
-              </div>
-            </div>
-          )}
+          <div className="flex min-w-0 items-center gap-3">
+            {activeConversation?.type === "workspace" && (
+              <>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100">
+                  <MessageSquare className="h-5 w-5 text-violet-600" />
+                </div>
+                <div>
+                  <h2 className="text-[15px] font-bold text-slate-900">Workspace</h2>
+                  <p className="text-[11px] text-slate-400">General channel</p>
+                </div>
+              </>
+            )}
 
-          {activeConversation?.type === "group" && (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100">
-                <Users className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-900">
-                  {activeConversation.title || "Group chat"}
-                </h2>
-                <p className="text-[11px] text-slate-400">Custom group conversation</p>
-              </div>
-            </div>
-          )}
+            {activeConversation?.type === "group" && (
+              <>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100">
+                  <Users className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-[15px] font-bold text-slate-900">
+                    {activeConversation.title || "Group"}
+                  </h2>
+                  <p className="text-[11px] text-slate-400">Group conversation</p>
+                </div>
+              </>
+            )}
 
-          {activeConversation?.type === "direct" && (
-            <div className="flex items-center gap-3">
-              <AvatarCircle
-                name={activeDirectOther?.full_name || "User"}
-                avatarUrl={activeDirectOther?.avatar_url || null}
-                size="sm"
-                userId={activeDirectOther?.user_id || ""}
-              />
-              <div>
-                <h2 className="text-[15px] font-bold text-slate-900">
-                  {activeDirectOther?.full_name || "Direct message"}
-                </h2>
-                <p className="text-[11px] text-slate-400">Private conversation</p>
-              </div>
-            </div>
-          )}
+            {activeConversation?.type === "direct" && (
+              <>
+                <AvatarCircle
+                  name={activeDirectOther?.full_name || "User"}
+                  avatarUrl={activeDirectOther?.avatar_url || null}
+                  size="sm"
+                  userId={activeDirectOther?.user_id || ""}
+                />
+                <div>
+                  <h2 className="text-[15px] font-bold text-slate-900">
+                    {activeDirectOther?.full_name || "Direct message"}
+                  </h2>
+                  <p className="text-[11px] text-slate-400">Private conversation</p>
+                </div>
+              </>
+            )}
+          </div>
 
-          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
-            Live
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+              Live
+            </span>
+
+            {canManageActiveGroup && (
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenuOpen((v) => !v)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+
+                {activeMenuOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-20 w-[170px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <button
+                      onClick={archiveActiveGroup}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete group
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -1148,7 +1332,7 @@ function ChatPanel({
                   </div>
 
                   <div
-                    className={`flex max-w-[220px] flex-col ${
+                    className={`flex max-w-[240px] flex-col ${
                       msg.isMe ? "items-end" : "items-start"
                     }`}
                   >
@@ -1255,8 +1439,8 @@ function ChatPanel({
           <div className="w-[320px] rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-slate-900">Create group chat</p>
-                <p className="text-[11px] text-slate-400">Select teammates and a title</p>
+                <p className="text-sm font-bold text-slate-900">Create group</p>
+                <p className="text-[11px] text-slate-400">Select teammates and name it</p>
               </div>
               <button
                 onClick={() => setCreateGroupOpen(false)}
@@ -1385,10 +1569,10 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
       .order("created_at", { ascending: false })
       .limit(8);
 
-    if (!error) {
-      setNotifications((data || []) as NotificationItem[]);
+    if (error) {
+      logSupabaseError("loadNotifications error", error);
     } else {
-      console.error(error);
+      setNotifications((data || []) as NotificationItem[]);
     }
 
     setNotificationsLoading(false);
@@ -1403,6 +1587,7 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
+          logSupabaseError("auth.getUser error", userError);
           router.push("/");
           return;
         }
@@ -1416,6 +1601,7 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
           .maybeSingle();
 
         if (membershipError || !membership?.workspace_id) {
+          if (membershipError) logSupabaseError("load membership error", membershipError);
           router.push("/onboarding");
           return;
         }
@@ -1428,15 +1614,21 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
           .eq("id", membership.workspace_id)
           .single();
 
-        if (!workspaceError && workspaceData) {
+        if (workspaceError) {
+          logSupabaseError("load workspace error", workspaceError);
+        } else if (workspaceData) {
           setWorkspace(workspaceData);
         }
 
-        const { data: profileData } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, avatar_url")
           .eq("id", user.id)
           .maybeSingle();
+
+        if (profileError) {
+          logSupabaseError("load profile error", profileError);
+        }
 
         setProfile({
           full_name:
@@ -1447,11 +1639,15 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
           avatar_url: profileData?.avatar_url || null,
         });
 
-        const { data: membersData } = await supabase
+        const { data: membersData, error: membersError } = await supabase
           .from("workspace_members")
           .select("user_id, role")
           .eq("workspace_id", membership.workspace_id)
           .order("created_at", { ascending: true });
+
+        if (membersError) {
+          logSupabaseError("load workspace members error", membersError);
+        }
 
         const userIds = (membersData ?? []).map((m) => m.user_id);
 
@@ -1461,10 +1657,14 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
         >();
 
         if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
+          const { data: profilesData, error: teamProfilesError } = await supabase
             .from("profiles")
             .select("id, full_name, avatar_url")
             .in("id", userIds);
+
+          if (teamProfilesError) {
+            logSupabaseError("load team profiles error", teamProfilesError);
+          }
 
           profilesMap = new Map(
             (profilesData ?? []).map((p: any) => [
@@ -1514,7 +1714,11 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
           .eq("workspace_id", workspace.id)
           .order("created_at", { ascending: true });
 
-        if (membersError) throw membersError;
+        if (membersError) {
+          logSupabaseError("modal load workspace members error", membersError);
+          setTeamMembers([]);
+          return;
+        }
 
         const userIds = (membersData ?? []).map((m) => m.user_id);
 
@@ -1524,10 +1728,14 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
         >();
 
         if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
+          const { data: profilesData, error: profilesError } = await supabase
             .from("profiles")
             .select("id, full_name, avatar_url")
             .in("id", userIds);
+
+          if (profilesError) {
+            logSupabaseError("modal load profiles error", profilesError);
+          }
 
           profilesMap = new Map(
             (profilesData ?? []).map((p: any) => [
@@ -1545,8 +1753,6 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
         }));
 
         setTeamMembers(mapped);
-      } catch {
-        setTeamMembers([]);
       } finally {
         setTeamLoading(false);
       }
@@ -1623,7 +1829,9 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
         .eq("workspace_id", workspace.id)
         .eq("user_id", userId);
 
-      if (!error) {
+      if (error) {
+        logSupabaseError("handleRoleChange error", error);
+      } else {
         setTeamMembers((prev) =>
           prev.map((m) => (m.user_id === userId ? { ...m, role: newRole } : m))
         );
@@ -1689,12 +1897,6 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
 
   return (
     <main className="min-h-screen bg-[#f6f7fb]">
-      <style>{`
-        .rb-soft-shadow {
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
-        }
-      `}</style>
-
       <div className="flex min-h-screen">
         <aside
           onMouseEnter={() => setExpanded(true)}
@@ -2202,12 +2404,6 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
                         })
                       )}
                     </div>
-
-                    {isOwner && (
-                      <p className="mt-3 text-xs text-slate-400">
-                        Owners can change team roles by clicking the role badge.
-                      </p>
-                    )}
                   </div>
                 </div>
               )}

@@ -102,10 +102,64 @@ function sanitizeInt(value: unknown, fallback = 3) {
   return Math.max(1, Math.min(5, Math.round(n)));
 }
 
-function sanitizeCategory(value: unknown) {
-  const text = sanitizeText(value, "Technical");
-  if (ALLOWED_CATEGORIES.has(text)) return text;
+function translateCategoryToEnglish(value: unknown) {
+  const raw = sanitizeText(value, "Technical").trim();
+  const normalized = raw.toLowerCase();
+
+  const categoryMap: Record<string, string> = {
+    permits: "Permits",
+    vergunningen: "Permits",
+
+    planning: "Planning",
+    planningen: "Planning",
+    planningrisico: "Planning",
+
+    financial: "Financial",
+    financieel: "Financial",
+    financiel: "Financial",
+
+    safety: "Safety",
+    veiligheid: "Safety",
+
+    environment: "Environment",
+    milieu: "Environment",
+    omgeving: "Environment",
+
+    suppliers: "Suppliers",
+    leverancier: "Suppliers",
+    leveranciers: "Suppliers",
+
+    technical: "Technical",
+    technisch: "Technical",
+    techniek: "Technical",
+
+    stakeholders: "Stakeholders",
+    belanghebbenden: "Stakeholders",
+
+    weather: "Weather",
+    weer: "Weather",
+
+    utilities: "Utilities",
+    nutsvoorzieningen: "Utilities",
+    kabels: "Utilities",
+    leidingen: "Utilities",
+
+    quality: "Quality",
+    kwaliteit: "Quality",
+
+    contractual: "Contractual",
+    contractueel: "Contractual",
+    contracten: "Contractual",
+  };
+
+  const mapped = categoryMap[normalized] || raw;
+
+  if (ALLOWED_CATEGORIES.has(mapped)) return mapped;
   return "Technical";
+}
+
+function sanitizeCategory(value: unknown) {
+  return translateCategoryToEnglish(value);
 }
 
 function dedupeRisks(risks: GeneratedRisk[]) {
@@ -193,21 +247,59 @@ function templateScore(template: RiskTemplateRow, project: ProjectRow) {
   return score;
 }
 
+function replaceDutchTerms(text: string) {
+  if (!text) return "";
+
+  const replacements: Array<[RegExp, string]> = [
+    [/\bvergunning(en)?\b/gi, "permit"],
+    [/\bvertraging\b/gi, "delay"],
+    [/\bveiligheid\b/gi, "safety"],
+    [/\bkwaliteit\b/gi, "quality"],
+    [/\bleverancier(s)?\b/gi, "supplier"],
+    [/\bweer(somstandigheden)?\b/gi, "weather conditions"],
+    [/\bnutsvoorzieningen\b/gi, "utilities"],
+    [/\bbelanghebbenden\b/gi, "stakeholders"],
+    [/\bcontractueel\b/gi, "contractual"],
+    [/\bmilieu\b/gi, "environment"],
+    [/\btechnisch\b/gi, "technical"],
+    [/\bfinancieel\b/gi, "financial"],
+    [/\bplanning\b/gi, "planning"],
+    [/\bmaatregel(en)?\b/gi, "mitigation action"],
+    [/\brisico'?s\b/gi, "risks"],
+    [/\brisico\b/gi, "risk"],
+  ];
+
+  let output = text;
+  for (const [pattern, replacement] of replacements) {
+    output = output.replace(pattern, replacement);
+  }
+
+  return output.trim();
+}
+
+function ensureEnglishText(value: unknown, fallback = "") {
+  const text = sanitizeText(value, fallback);
+  return replaceDutchTerms(text);
+}
+
 function mapTemplateToGeneratedRisk(template: RiskTemplateRow): GeneratedRisk {
   const probability = sanitizeInt(template.default_probability, 3);
   const impact = sanitizeInt(template.default_impact, 3);
   const score = probability * impact;
 
   return {
-    title: template.title,
-    description: template.description || "",
+    title: ensureEnglishText(template.title, "Project risk"),
+    description: ensureEnglishText(template.description, "Project risk identified from the baseline template library."),
     category: sanitizeCategory(template.category),
     probability,
     impact,
     score,
     level: computeLevel(score),
     suggested_action:
-      template.suggested_action || "Review this risk and define a mitigation action.",
+      ensureEnglishText(
+        template.suggested_action,
+        "Review this risk and define a mitigation action."
+      ),
     source_type: "template",
     source_template_id: template.id,
     generation_reason: "Matched from the baseline risk template library.",
@@ -295,13 +387,21 @@ async function generateAiRisks(
     baseline.map((r) => r.title)
   );
 
-  const prompt = `You are an expert project risk manager for construction and infrastructure projects.
+  const prompt = `
+You are a senior project risk manager for construction and infrastructure projects.
 
-There are already baseline risks generated from templates.
-Return ONLY 3 to 5 additional project-specific risks that are NOT duplicates of the baseline.
-Do not repeat generic risks already covered.
-Do not include markdown.
-Return ONLY a valid JSON array.
+CRITICAL LANGUAGE RULES:
+- Return EVERYTHING in English only.
+- Never use Dutch.
+- If the project context contains Dutch words, translate them into professional English before generating output.
+- Risk titles, descriptions, categories, suggested actions and reasons must all be in English.
+
+OUTPUT RULES:
+- There are already baseline risks generated from templates.
+- Return ONLY 3 to 5 additional project-specific risks that are NOT duplicates of the baseline.
+- Do not repeat generic risks already covered.
+- Do not include markdown.
+- Return ONLY a valid JSON array.
 
 PROJECT CONTEXT:
 ${context}
@@ -311,14 +411,15 @@ Permits, Planning, Financial, Safety, Environment, Suppliers, Technical, Stakeho
 
 Each JSON item must be exactly:
 {
-  "title": "Short risk title",
-  "description": "Short project-specific description",
+  "title": "Short risk title in English",
+  "description": "Short project-specific description in English",
   "category": "One allowed category",
   "probability": 1,
   "impact": 1,
-  "suggested_action": "Concrete mitigation action",
-  "generation_reason": "Why this risk is relevant to this project"
-}`;
+  "suggested_action": "Concrete mitigation action in English",
+  "generation_reason": "Why this risk is relevant to this project in English"
+}
+`.trim();
 
   console.log("AI STEP 3: calling Anthropic...");
 
@@ -333,6 +434,14 @@ Each JSON item must be exactly:
       model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
       max_tokens: 1400,
       temperature: 0.2,
+      system: `
+You are an expert risk analyst.
+
+Always respond in English only.
+Never return Dutch.
+Translate Dutch project context to English internally before generating the answer.
+Return only valid JSON.
+      `.trim(),
       messages: [
         {
           role: "user",
@@ -370,20 +479,20 @@ Each JSON item must be exactly:
       const score = probability * impact;
 
       return {
-        title: sanitizeText(item?.title),
-        description: sanitizeText(item?.description),
+        title: ensureEnglishText(item?.title, "Project risk"),
+        description: ensureEnglishText(item?.description, "Project-specific risk identified by AI."),
         category: sanitizeCategory(item?.category),
         probability,
         impact,
         score,
         level: computeLevel(score),
-        suggested_action: sanitizeText(
+        suggested_action: ensureEnglishText(
           item?.suggested_action,
           "Review this risk and define a mitigation action."
         ),
         source_type: "ai" as const,
         source_template_id: null,
-        generation_reason: sanitizeText(
+        generation_reason: ensureEnglishText(
           item?.generation_reason,
           "AI project-specific suggestion."
         ),

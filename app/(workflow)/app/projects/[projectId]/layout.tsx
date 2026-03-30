@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   LogOut,
   Bell,
   BadgeAlert,
+  UserCircle2,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -25,32 +26,6 @@ const supabase = createClient(
 
 type Project = { id: string; name: string; status: string | null };
 type Profile = { full_name: string | null; avatar_url: string | null };
-
-function getStatusClasses(status: string | null) {
-  switch (status) {
-    case "active":
-      return "border border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "at_risk":
-      return "border border-amber-200 bg-amber-50 text-amber-700";
-    case "high_risk":
-      return "border border-red-200 bg-red-50 text-red-700";
-    default:
-      return "border border-slate-200 bg-slate-50 text-slate-600";
-  }
-}
-
-function getStatusLabel(status: string | null) {
-  switch (status) {
-    case "active":
-      return "Healthy";
-    case "at_risk":
-      return "Watchlist";
-    case "high_risk":
-      return "Critical";
-    default:
-      return "Draft";
-  }
-}
 
 export default function ProjectLayout({
   children,
@@ -68,6 +43,9 @@ export default function ProjectLayout({
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function loadShellData() {
@@ -117,6 +95,20 @@ export default function ProjectLayout({
 
     if (projectId) loadShellData();
   }, [projectId, router]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -177,7 +169,7 @@ export default function ProjectLayout({
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-[#f6f7fb]">
+      <div className="flex h-screen overflow-hidden bg-[#f6f7fb]">
         <div className="h-screen w-[84px] shrink-0 border-r border-[#e8ebf2] bg-white" />
         <div className="flex-1 p-8">
           <div className="rounded-2xl border border-[#e8ebf2] bg-white p-10 shadow-sm">
@@ -189,13 +181,13 @@ export default function ProjectLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f6f7fb] text-[#111827]">
+    <div className="flex h-screen overflow-hidden bg-[#f6f7fb] text-[#111827]">
       <aside
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
         className={`${
           expanded ? "w-[250px]" : "w-[84px]"
-        } sticky top-0 flex h-screen shrink-0 flex-col border-r border-[#e8ebf2] bg-white transition-all duration-300`}
+        } sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-[#e8ebf2] bg-white transition-all duration-300`}
       >
         <div className="flex h-[76px] items-center border-b border-[#eef1f6] px-4">
           <div className="flex min-w-0 items-center">
@@ -220,7 +212,7 @@ export default function ProjectLayout({
           </div>
         </div>
 
-        <div className="px-3 pt-4 pb-2">
+        <div className="px-3 pb-2 pt-4">
           <Link
             href="/app"
             className="flex h-11 items-center rounded-xl px-3 text-[13px] font-medium text-[#64748b] transition hover:bg-[#f5f7fb] hover:text-[#111827]"
@@ -236,7 +228,7 @@ export default function ProjectLayout({
           </Link>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 pt-2">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div
             className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8] transition-all duration-300 ${
               expanded ? "opacity-100" : "opacity-0"
@@ -279,7 +271,7 @@ export default function ProjectLayout({
           })}
         </nav>
 
-        <div className="border-t border-[#eef1f6] px-3 pt-4 pb-4">
+        <div className="border-t border-[#eef1f6] px-3 pb-4 pt-4">
           <div
             className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8] transition-all duration-300 ${
               expanded ? "opacity-100" : "opacity-0"
@@ -365,7 +357,7 @@ export default function ProjectLayout({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-20 flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8ebf2] bg-white px-8">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Link
@@ -379,14 +371,6 @@ export default function ProjectLayout({
 
             <span className="truncate text-[15px] font-semibold text-[#111827]">
               {project?.name}
-            </span>
-
-            <span
-              className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${getStatusClasses(
-                project?.status ?? null
-              )}`}
-            >
-              {getStatusLabel(project?.status ?? null)}
             </span>
           </div>
 
@@ -403,29 +387,92 @@ export default function ProjectLayout({
               )}
             </Link>
 
-            <div className="flex items-center gap-3 rounded-xl border border-[#e8ebf2] bg-white px-3 py-2">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name || "User"}
-                  className="h-8 w-8 rounded-full object-cover"
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
+                className="flex items-center gap-3 rounded-xl border border-[#e8ebf2] bg-white px-3 py-2 transition hover:bg-[#f8fafc]"
+              >
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name || "User"}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-semibold text-white">
+                    {(profile?.full_name || "R").slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+
+                <span className="hidden text-[14px] font-semibold text-[#111827] sm:block">
+                  {profile?.full_name || "User"}
+                </span>
+
+                <ChevronDown
+                  className={`h-4 w-4 text-[#94a3b8] transition ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
                 />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-semibold text-white">
-                  {(profile?.full_name || "R").slice(0, 1).toUpperCase()}
+              </button>
+
+              {profileMenuOpen && (
+                <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[260px] overflow-hidden rounded-2xl border border-[#e8ebf2] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
+                  <div className="border-b border-[#eef1f6] px-5 py-4">
+                    <p className="text-[16px] font-semibold text-[#111827]">
+                      {profile?.full_name || "User"}
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#94a3b8]">Owner</p>
+                  </div>
+
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        router.push(`/app/projects/${projectId}/profile`);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] text-[#334155] transition hover:bg-[#f8fafc]"
+                    >
+                      <UserCircle2 className="h-4 w-4" />
+                      <span>Go to profile</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        router.push(`/app/projects/${projectId}/settings`);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] text-[#334155] transition hover:bg-[#f8fafc]"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </button>
+
+                    <div className="my-2 h-px bg-[#eef1f6]" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] text-red-600 transition hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>{loggingOut ? "Logging out..." : "Log out"}</span>
+                    </button>
+                  </div>
                 </div>
               )}
-
-              <span className="hidden text-[14px] font-semibold text-[#111827] sm:block">
-                {profile?.full_name || "User"}
-              </span>
-
-              <ChevronDown className="h-4 w-4 text-[#94a3b8]" />
             </div>
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+          {children}
+        </main>
       </div>
     </div>
   );
