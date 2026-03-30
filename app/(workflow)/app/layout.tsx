@@ -18,6 +18,7 @@ type Workspace = { id: string; name: string; company_name: string | null; join_k
 type Profile = { full_name: string | null; avatar_url: string | null };
 type TeamMember = { user_id: string; role: string; full_name: string | null; avatar_url: string | null };
 type ModalType = "team" | "billing" | "settings" | null;
+type ProfileDropdownOpen = boolean;
 type ChatMessage = {
   id: string; user_id: string; content: string; created_at: string;
   sender_name: string | null; sender_avatar: string | null;
@@ -64,6 +65,7 @@ function ChatPanel({ workspaceId, currentUserId, currentProfile, onClose }: {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -113,19 +115,16 @@ function ChatPanel({ workspaceId, currentUserId, currentProfile, onClose }: {
         sender_avatar: currentProfile?.avatar_url ?? null,
       });
       if (error) {
-        // Table doesn't exist yet — show setup message
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          user_id: "system",
-          content: "⚠️ Chat table not found. Run the SQL migration to enable chat.",
-          created_at: new Date().toISOString(),
-          sender_name: "System",
-          sender_avatar: null,
-        }]);
+        console.error("Chat error:", error);
       }
     } finally {
       setSending(false);
     }
+  }
+
+  async function deleteMessage(messageId: string) {
+    const { error } = await supabase.from("workspace_chat").delete().eq("id", messageId).eq("user_id", currentUserId);
+    if (!error) setMessages(prev => prev.filter(m => m.id !== messageId));
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -167,16 +166,14 @@ function ChatPanel({ workspaceId, currentUserId, currentProfile, onClose }: {
             </div>
             <p className="text-sm font-semibold text-slate-700">Geen berichten nog</p>
             <p className="text-xs text-slate-400 mt-1">Stuur het eerste bericht naar je team!</p>
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-left max-w-[260px]">
-              <p className="text-[11px] font-semibold text-amber-700 mb-1">SQL nodig voor chat:</p>
-              <code className="text-[10px] text-amber-800 leading-relaxed">
-                {`CREATE TABLE workspace_chat (\n  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,\n  workspace_id uuid NOT NULL,\n  user_id uuid NOT NULL,\n  content text NOT NULL,\n  sender_name text,\n  sender_avatar text,\n  created_at timestamptz DEFAULT now()\n);\nALTER TABLE workspace_chat ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "members can chat" ON workspace_chat\n  FOR ALL USING (true) WITH CHECK (true);`}
-              </code>
-            </div>
           </div>
         )}
         {grouped.map((msg) => (
-          <div key={msg.id} className={`flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : ""} ${msg.showAvatar ? "mt-3" : "mt-0.5"}`}>
+          <div key={msg.id}
+            className={`flex gap-2.5 ${msg.isMe ? "flex-row-reverse" : ""} ${msg.showAvatar ? "mt-3" : "mt-0.5"}`}
+            onMouseEnter={() => setHoveredMessageId(msg.id)}
+            onMouseLeave={() => setHoveredMessageId(null)}
+            style={{ position: "relative" }}>
             {/* Avatar */}
             <div className="flex-shrink-0 self-end">
               {msg.showAvatar
@@ -188,14 +185,26 @@ function ChatPanel({ workspaceId, currentUserId, currentProfile, onClose }: {
               {msg.showName && !msg.isMe && (
                 <span className="text-[11px] font-semibold text-slate-500 mb-1 ml-1">{msg.sender_name ?? "User"}</span>
               )}
-              <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug break-words ${
-                msg.isMe
-                  ? "bg-violet-600 text-white rounded-br-sm"
-                  : msg.user_id === "system"
-                  ? "bg-amber-50 text-amber-800 border border-amber-200 text-[11px]"
-                  : "bg-slate-100 text-slate-800 rounded-bl-sm"
-              }`}>
-                {msg.content}
+              <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, flexDirection: msg.isMe ? "row" : "row-reverse" }}>
+                {msg.isMe && hoveredMessageId === msg.id && (
+                  <button
+                    onClick={() => deleteMessage(msg.id)}
+                    title="Verwijder bericht"
+                    style={{ flexShrink: 0, padding: "2px 4px", borderRadius: 6, border: "none", background: "#f1f5f9", cursor: "pointer", color: "#94a3b8", display: "flex", alignItems: "center" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.color = "#ef4444"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#f1f5f9"; e.currentTarget.style.color = "#94a3b8"; }}>
+                    <X style={{ height: 12, width: 12 }}/>
+                  </button>
+                )}
+                <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug break-words ${
+                  msg.isMe
+                    ? "bg-violet-600 text-white rounded-br-sm"
+                    : msg.user_id === "system"
+                    ? "bg-amber-50 text-amber-800 border border-amber-200 text-[11px]"
+                    : "bg-slate-100 text-slate-800 rounded-bl-sm"
+                }`}>
+                  {msg.content}
+                </div>
               </div>
               <span className="text-[10px] text-slate-400 mt-0.5 mx-1">{formatTime(msg.created_at)}</span>
             </div>
@@ -378,6 +387,8 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
   const [roleDropdownOpen, setRoleDropdownOpen] = useState<string | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function loadShellData() {
@@ -436,6 +447,17 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
   const isOwner = currentUserRole === "owner";
 
   async function handleLogout() { await supabase.auth.signOut(); router.push("/"); }
+
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function copyWorkspaceKey() {
     if (!workspace?.join_key) return;
@@ -545,14 +567,6 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
               <ChevronDown style={{ height: 16, width: 16, color: "#94a3b8" }}/>
             </button>
 
-            {/* Center: search */}
-            <div style={{ flex: 1, maxWidth: 380, margin: "0 24px", position: "relative" }}>
-              <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", height: 16, width: 16, color: "#94a3b8" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input placeholder="Search..." style={{ width: "100%", height: 40, borderRadius: 20, border: "1px solid #e8eaf0", background: "#f8f9fb", paddingLeft: 40, paddingRight: 16, fontSize: 14, color: "#374151", outline: "none" }}/>
-            </div>
-
             {/* Right: bell + avatar */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 40, width: 40, borderRadius: 10, border: "none", background: "transparent", cursor: "pointer" }}
@@ -560,13 +574,48 @@ export default function WorkflowLayout({ children }: { children: React.ReactNode
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                 <Bell style={{ height: 20, width: 20, color: "#64748b" }}/>
               </button>
-              <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer" }}
-                onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <AvatarCircle name={displayName} avatarUrl={profile?.avatar_url ?? null} size="sm" userId={currentUserId ?? ""}/>
-                <span style={{ fontSize: 15, fontWeight: 600, color: "#374151" }} className="hidden sm:block">{displayName}</span>
-                <ChevronDown style={{ height: 16, width: 16, color: "#94a3b8" }}/>
-              </button>
+              <div ref={profileDropdownRef} style={{ position: "relative" }}>
+                <button
+                  onClick={() => setProfileDropdownOpen(v => !v)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 10, border: "none", background: profileDropdownOpen ? "#f8f9fb" : "transparent", cursor: "pointer" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
+                  onMouseLeave={e => { if (!profileDropdownOpen) e.currentTarget.style.background = "transparent"; }}>
+                  <AvatarCircle name={displayName} avatarUrl={profile?.avatar_url ?? null} size="sm" userId={currentUserId ?? ""}/>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#374151" }} className="hidden sm:block">{displayName}</span>
+                  <ChevronDown style={{ height: 16, width: 16, color: "#94a3b8", transform: profileDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 200ms" }}/>
+                </button>
+                {profileDropdownOpen && (
+                  <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 220, background: "#fff", border: "1px solid #e8eaf0", borderRadius: 14, boxShadow: "0 8px 32px rgba(15,23,42,0.12)", zIndex: 100, overflow: "hidden" }}>
+                    {/* User info header */}
+                    <div style={{ padding: "14px 16px", borderBottom: "1px solid #f0f0f5" }}>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1e293b", margin: 0 }}>{displayName}</p>
+                      <p style={{ fontSize: 12, color: "#94a3b8", margin: "2px 0 0", textTransform: "capitalize" }}>{currentUserRole ?? ""}</p>
+                    </div>
+                    {/* Menu items */}
+                    <div style={{ padding: "6px" }}>
+                      <button onClick={() => { setProfileDropdownOpen(false); router.push("/app/profile"); }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 14, color: "#374151", fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <Users style={{ height: 16, width: 16, color: "#64748b" }}/> Go to profile
+                      </button>
+                      <button onClick={() => { setProfileDropdownOpen(false); setModal("settings"); }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 14, color: "#374151", fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <Settings style={{ height: 16, width: 16, color: "#64748b" }}/> Settings
+                      </button>
+                      <div style={{ height: 1, background: "#f0f0f5", margin: "4px 0" }}/>
+                      <button onClick={() => { setProfileDropdownOpen(false); handleLogout(); }}
+                        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 14, color: "#ef4444", fontWeight: 500 }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#fff5f5")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                        <LogOut style={{ height: 16, width: 16, color: "#ef4444" }}/> Log out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 

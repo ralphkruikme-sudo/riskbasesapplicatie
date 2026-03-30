@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";
+
 type ProjectRow = {
   id: string;
   name: string;
@@ -59,6 +61,21 @@ type GeneratedRisk = {
   generation_reason?: string | null;
 };
 
+const ALLOWED_CATEGORIES = new Set([
+  "Permits",
+  "Planning",
+  "Financial",
+  "Safety",
+  "Environment",
+  "Suppliers",
+  "Technical",
+  "Stakeholders",
+  "Weather",
+  "Utilities",
+  "Quality",
+  "Contractual",
+]);
+
 function computeLevel(score: number): "low" | "medium" | "high" {
   if (score >= 15) return "high";
   if (score >= 7) return "medium";
@@ -83,6 +100,12 @@ function sanitizeInt(value: unknown, fallback = 3) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(1, Math.min(5, Math.round(n)));
+}
+
+function sanitizeCategory(value: unknown) {
+  const text = sanitizeText(value, "Technical");
+  if (ALLOWED_CATEGORIES.has(text)) return text;
+  return "Technical";
 }
 
 function dedupeRisks(risks: GeneratedRisk[]) {
@@ -171,14 +194,14 @@ function templateScore(template: RiskTemplateRow, project: ProjectRow) {
 }
 
 function mapTemplateToGeneratedRisk(template: RiskTemplateRow): GeneratedRisk {
-  const probability = Number(template.default_probability || 3);
-  const impact = Number(template.default_impact || 3);
+  const probability = sanitizeInt(template.default_probability, 3);
+  const impact = sanitizeInt(template.default_impact, 3);
   const score = probability * impact;
 
   return {
     title: template.title,
     description: template.description || "",
-    category: template.category,
+    category: sanitizeCategory(template.category),
     probability,
     impact,
     score,
@@ -231,13 +254,39 @@ function buildProjectContext(project: ProjectRow, baselineTitles: string[]) {
   return lines.filter(Boolean).join("\n");
 }
 
+function extractJSONArray(text: string) {
+  const cleaned = text.replace(/```json|```/gi, "").trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+
+  if (start !== -1 && end !== -1 && end > start) {
+    const candidate = cleaned.slice(start, end + 1);
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+
+  return [];
+}
+
 async function generateAiRisks(
   project: ProjectRow,
   baseline: GeneratedRisk[]
 ): Promise<GeneratedRisk[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
+  console.log("AI STEP 1: generateAiRisks called");
+  console.log("AI STEP 2: api key exists?", !!apiKey);
+
   if (!apiKey) {
+    console.error("AI STEP FAIL: Missing ANTHROPIC_API_KEY");
     return [];
   }
 
@@ -246,26 +295,32 @@ async function generateAiRisks(
     baseline.map((r) => r.title)
   );
 
-  const prompt = `You are an expert risk manager for construction and infrastructure projects.
+  const prompt = `You are an expert project risk manager for construction and infrastructure projects.
 
 There are already baseline risks generated from templates.
-Add ONLY 3 to 5 extra project-specific risks that are NOT duplicates of the baseline.
+Return ONLY 3 to 5 additional project-specific risks that are NOT duplicates of the baseline.
 Do not repeat generic risks already covered.
-Return ONLY a valid JSON array and nothing else.
+Do not include markdown.
+Return ONLY a valid JSON array.
 
 PROJECT CONTEXT:
 ${context}
 
-Each item in the JSON array must use exactly this structure:
+Allowed categories:
+Permits, Planning, Financial, Safety, Environment, Suppliers, Technical, Stakeholders, Weather, Utilities, Quality, Contractual
+
+Each JSON item must be exactly:
 {
   "title": "Short risk title",
   "description": "Short project-specific description",
-  "category": "Permits | Planning | Financial | Safety | Environment | Suppliers | Technical | Stakeholders | Weather | Utilities | Quality | Contractual",
+  "category": "One allowed category",
   "probability": 1,
   "impact": 1,
   "suggested_action": "Concrete mitigation action",
   "generation_reason": "Why this risk is relevant to this project"
 }`;
+
+  console.log("AI STEP 3: calling Anthropic...");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -275,8 +330,9 @@ Each item in the JSON array must use exactly this structure:
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2200,
+      model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-latest",
+      max_tokens: 1400,
+      temperature: 0.2,
       messages: [
         {
           role: "user",
@@ -286,6 +342,8 @@ Each item in the JSON array must use exactly this structure:
     }),
   });
 
+  console.log("AI STEP 4: Anthropic status =", response.status);
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Anthropic error:", errorText);
@@ -293,24 +351,20 @@ Each item in the JSON array must use exactly this structure:
   }
 
   const data = await response.json();
+  console.log("AI STEP 5: raw Anthropic response received");
+
   const textBlock = data?.content?.find((block: any) => block?.type === "text");
   const rawText = textBlock?.text || "";
-  const cleanText = rawText.replace(/```json|```/gi, "").trim();
 
-  let parsed: any[] = [];
+  console.log("AI STEP 6: raw text =", rawText);
 
-  try {
-    const json = JSON.parse(cleanText);
-    if (Array.isArray(json)) parsed = json;
-  } catch (error) {
-    console.error("Failed to parse AI JSON:", error);
-    return [];
-  }
+  const parsed = extractJSONArray(rawText);
+  console.log("AI STEP 7: parsed items =", parsed.length);
 
   const baselineTitles = new Set(baseline.map((r) => normalizeText(r.title)));
 
   const aiRisks: GeneratedRisk[] = parsed
-    .map((item) => {
+    .map((item: any) => {
       const probability = sanitizeInt(item?.probability, 3);
       const impact = sanitizeInt(item?.impact, 3);
       const score = probability * impact;
@@ -318,7 +372,7 @@ Each item in the JSON array must use exactly this structure:
       return {
         title: sanitizeText(item?.title),
         description: sanitizeText(item?.description),
-        category: sanitizeText(item?.category, "Technical"),
+        category: sanitizeCategory(item?.category),
         probability,
         impact,
         score,
@@ -338,6 +392,8 @@ Each item in the JSON array must use exactly this structure:
     .filter((risk) => risk.title.length > 0)
     .filter((risk) => !baselineTitles.has(normalizeText(risk.title)));
 
+  console.log("AI STEP 8: final ai risks =", aiRisks.length);
+
   return dedupeRisks(aiRisks).slice(0, 5);
 }
 
@@ -346,7 +402,10 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
+    console.log("ROUTE HIT: generate-risk");
+
     const { projectId } = await params;
+    console.log("projectId:", projectId);
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
       return NextResponse.json(
@@ -396,8 +455,11 @@ export async function POST(
       .single<ProjectRow>();
 
     if (projectError || !project) {
+      console.error("PROJECT ERROR:", projectError);
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
+
+    console.log("PROJECT LOADED:", project.name);
 
     const { data: templates, error: templatesError } = await supabase
       .from("risk_templates")
@@ -424,23 +486,46 @@ export async function POST(
       .returns<RiskTemplateRow[]>();
 
     if (templatesError) {
+      console.error("TEMPLATES ERROR:", templatesError);
       return NextResponse.json(
         { error: templatesError.message || "Could not load risk templates." },
         { status: 500 }
       );
     }
 
-    const matchedTemplates = (templates || [])
+    console.log("TEMPLATES COUNT:", templates?.length || 0);
+
+    const allTemplates = templates || [];
+
+    const strictMatches = allTemplates
       .filter((template) => templateMatchesProject(template, project))
-      .sort((a, b) => templateScore(b, project) - templateScore(a, project))
-      .slice(0, 12);
+      .sort((a, b) => templateScore(b, project) - templateScore(a, project));
+
+    const fallbackMatches = allTemplates
+      .filter((template) => !strictMatches.some((t) => t.id === template.id))
+      .map((template) => ({
+        template,
+        score: templateScore(template, project),
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.template);
+
+    const matchedTemplates = [...strictMatches, ...fallbackMatches].slice(0, 12);
 
     const baseline = dedupeRisks(
       matchedTemplates.map((template) => mapTemplateToGeneratedRisk(template))
     );
 
+    console.log("BASELINE COUNT:", baseline.length);
+    console.log("CALLING AI NOW");
+    console.log("ANTHROPIC KEY EXISTS:", !!process.env.ANTHROPIC_API_KEY);
+
     const ai = await generateAiRisks(project, baseline);
+    console.log("AI COUNT:", ai.length);
+
     const combined = dedupeRisks([...baseline, ...ai]);
+    console.log("COMBINED COUNT:", combined.length);
 
     return NextResponse.json({
       baseline,
@@ -448,7 +533,7 @@ export async function POST(
       combined,
     });
   } catch (error: any) {
-    console.error("generate-risks route error:", error);
+    console.error("generate-risk route error:", error);
 
     return NextResponse.json(
       { error: error?.message || "Unknown error while generating risks." },

@@ -5,9 +5,17 @@ import { usePathname, useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import {
-  ArrowLeft, BarChart3, ClipboardList, FileText, Settings,
-  ShieldAlert, Users, CheckSquare, ChevronDown, LogOut, Bell,
-  CalendarRange,
+  ArrowLeft,
+  BarChart3,
+  ClipboardList,
+  FileText,
+  Settings,
+  GitBranch,
+  CheckSquare,
+  ChevronDown,
+  LogOut,
+  Bell,
+  BadgeAlert,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -20,22 +28,35 @@ type Profile = { full_name: string | null; avatar_url: string | null };
 
 function getStatusClasses(status: string | null) {
   switch (status) {
-    case "active": return "bg-emerald-100 text-emerald-700";
-    case "at_risk": return "bg-amber-100 text-amber-700";
-    case "high_risk": return "bg-red-100 text-red-700";
-    default: return "bg-slate-100 text-slate-600";
-  }
-}
-function getStatusLabel(status: string | null) {
-  switch (status) {
-    case "active": return "Active";
-    case "at_risk": return "At Risk";
-    case "high_risk": return "High Risk";
-    default: return "Draft";
+    case "active":
+      return "border border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "at_risk":
+      return "border border-amber-200 bg-amber-50 text-amber-700";
+    case "high_risk":
+      return "border border-red-200 bg-red-50 text-red-700";
+    default:
+      return "border border-slate-200 bg-slate-50 text-slate-600";
   }
 }
 
-export default function ProjectLayout({ children }: { children: React.ReactNode }) {
+function getStatusLabel(status: string | null) {
+  switch (status) {
+    case "active":
+      return "Healthy";
+    case "at_risk":
+      return "Watchlist";
+    case "high_risk":
+      return "Critical";
+    default:
+      return "Draft";
+  }
+}
+
+export default function ProjectLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const params = useParams();
   const router = useRouter();
@@ -51,209 +72,360 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     async function loadShellData() {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/auth"); return; }
 
-      const [{ data: projectData, error: projectError }, { data: profileData }] = await Promise.all([
-        supabase.from("projects").select("id, name, status").eq("id", projectId).single(),
-        supabase.from("profiles").select("full_name, avatar_url").eq("id", user.id).maybeSingle(),
-      ]);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (projectError || !projectData) { router.push("/app"); return; }
+      if (!user) {
+        router.push("/auth");
+        return;
+      }
+
+      const [{ data: projectData, error: projectError }, { data: profileData }] =
+        await Promise.all([
+          supabase
+            .from("projects")
+            .select("id, name, status")
+            .eq("id", projectId)
+            .single(),
+          supabase
+            .from("profiles")
+            .select("full_name, avatar_url")
+            .eq("id", user.id)
+            .maybeSingle(),
+        ]);
+
+      if (projectError || !projectData) {
+        router.push("/app");
+        return;
+      }
+
       setProject(projectData);
       setProfile(profileData || null);
 
       const { count } = await supabase
-        .from("notifications").select("*", { count: "exact", head: true })
-        .eq("user_id", user.id).eq("project_id", projectId).eq("is_read", false);
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("project_id", projectId)
+        .eq("is_read", false);
+
       setUnreadCount(count || 0);
       setLoading(false);
     }
+
     if (projectId) loadShellData();
   }, [projectId, router]);
 
   async function handleLogout() {
     setLoggingOut(true);
-    try { await supabase.auth.signOut(); router.push("/auth"); }
-    finally { setLoggingOut(false); }
+    try {
+      await supabase.auth.signOut();
+      router.push("/auth");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
-  const navItems = useMemo(() => [
-    { label: "Dashboard",        href: `/app/projects/${projectId}`,                  icon: BarChart3 },
-    { label: "Risk Register",    href: `/app/projects/${projectId}/risk-register`,     icon: ClipboardList },
-    { label: "Risk Analysis",    href: `/app/projects/${projectId}/risk-analysis`,     icon: ShieldAlert },
-    { label: "Project Timeline", href: `/app/projects/${projectId}/project-timeline`,  icon: CalendarRange },
-    { label: "Actions",          href: `/app/projects/${projectId}/actions`,           icon: CheckSquare },
-    { label: "Stakeholders",     href: `/app/projects/${projectId}/stakeholders`,      icon: Users },
-    { label: "Reports",          href: `/app/projects/${projectId}/reports`,           icon: FileText },
-  ], [projectId]);
+  const navItems = useMemo(
+    () => [
+      {
+        label: "Overview",
+        href: `/app/projects/${projectId}`,
+        icon: BarChart3,
+      },
+      {
+        label: "Risk Analysis",
+        href: `/app/projects/${projectId}/risk-analysis`,
+        icon: BadgeAlert,
+      },
+      {
+        label: "Dependencies",
+        href: `/app/projects/${projectId}/dependencies`,
+        icon: GitBranch,
+      },
+      {
+        label: "Actions",
+        href: `/app/projects/${projectId}/actions`,
+        icon: CheckSquare,
+      },
+      {
+        label: "Reports",
+        href: `/app/projects/${projectId}/reports`,
+        icon: FileText,
+      },
+    ],
+    [projectId]
+  );
+
+  const bottomItems = useMemo(
+    () => [
+      {
+        label: "Risk Register",
+        href: `/app/projects/${projectId}/risk-register`,
+        icon: ClipboardList,
+      },
+      {
+        label: "Settings",
+        href: `/app/projects/${projectId}/settings`,
+        icon: Settings,
+      },
+    ],
+    [projectId]
+  );
 
   if (loading) {
     return (
-      <div style={{ display:"flex", height:"100vh", overflow:"hidden", background:"#f7f7fb" }}>
-        <div style={{ width:72, flexShrink:0, background:"#ffffff", borderRight:"1px solid #e8eaf0" }}/>
-        <div style={{ flex:1, padding:32 }}>
-          <div style={{ borderRadius:16, border:"1px solid #e8eaf0", background:"white", padding:40 }}>Loading...</div>
+      <div className="flex min-h-screen bg-[#f6f7fb]">
+        <div className="h-screen w-[84px] shrink-0 border-r border-[#e8ebf2] bg-white" />
+        <div className="flex-1 p-8">
+          <div className="rounded-2xl border border-[#e8ebf2] bg-white p-10 shadow-sm">
+            Loading...
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display:"flex", height:"100vh", overflow:"hidden", background:"#f7f7fb" }}>
-
-      {/* ── WHITE COLLAPSIBLE SIDEBAR ── */}
+    <div className="flex min-h-screen bg-[#f6f7fb] text-[#111827]">
       <aside
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
-        style={{
-          width: expanded ? 240 : 72, flexShrink: 0,
-          display: "flex", flexDirection: "column",
-          background: "#ffffff", borderRight: "1px solid #e8eaf0",
-          transition: "width 280ms ease", overflow: "hidden",
-          height: "100vh",
-        }}
+        className={`${
+          expanded ? "w-[250px]" : "w-[84px]"
+        } sticky top-0 flex h-screen shrink-0 flex-col border-r border-[#e8ebf2] bg-white transition-all duration-300`}
       >
-        {/* Logo area — WHITE */}
-        <div style={{ height:72, display:"flex", alignItems:"center", padding:"0 18px", borderBottom:"1px solid #e8eaf0", flexShrink:0, background:"#ffffff" }}>
-          <img src="/logo-icon.png" alt="RiskBases" style={{ height:36, width:36, borderRadius:10, objectFit:"contain", flexShrink:0 }}/>
-          <div style={{ overflow:"hidden", transition:"all 280ms", marginLeft: expanded ? 12 : 0, width: expanded ? 160 : 0, opacity: expanded ? 1 : 0 }}>
-            <p style={{ whiteSpace:"nowrap", fontSize:16, fontWeight:700, color:"#1a1a2e" }}>RiskBases</p>
-            <p style={{ whiteSpace:"nowrap", fontSize:11, color:"#94a3b8" }}>Project workspace</p>
+        <div className="flex h-[76px] items-center border-b border-[#eef1f6] px-4">
+          <div className="flex min-w-0 items-center">
+            <img
+              src="/logo-icon.png"
+              alt="RiskBases"
+              className="h-9 w-9 shrink-0 rounded-xl object-contain"
+            />
+
+            <div
+              className={`overflow-hidden transition-all duration-300 ${
+                expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+              }`}
+            >
+              <p className="whitespace-nowrap text-[15px] font-semibold text-[#111827]">
+                RiskBases
+              </p>
+              <p className="whitespace-nowrap text-[11px] text-[#94a3b8]">
+                Project workspace
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Everything below the line — DARK PURPLE */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", background:"linear-gradient(180deg, #1e2140 0%, #171929 100%)", overflow:"hidden" }}>
-
-          {/* Back to workspace */}
-          <div style={{ padding:"10px 10px 4px", flexShrink:0 }}>
-            <Link href="/app" style={{
-              display:"flex", alignItems:"center", height:40, borderRadius:8, padding:"0 12px",
-              color:"rgba(255,255,255,0.6)", textDecoration:"none", fontSize:13, fontWeight:500, transition:"background 150ms",
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background="rgba(255,255,255,0.08)")}
-              onMouseLeave={e => (e.currentTarget.style.background="transparent")}
+        <div className="px-3 pt-4 pb-2">
+          <Link
+            href="/app"
+            className="flex h-11 items-center rounded-xl px-3 text-[13px] font-medium text-[#64748b] transition hover:bg-[#f5f7fb] hover:text-[#111827]"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <span
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+                expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+              }`}
             >
-              <ArrowLeft style={{ height:16, width:16, flexShrink:0 }}/>
-              <span style={{ overflow:"hidden", whiteSpace:"nowrap", marginLeft: expanded ? 10 : 0, width: expanded ? "auto" : 0, opacity: expanded ? 1 : 0, transition:"all 280ms" }}>
-                Back to Workspace
-              </span>
-            </Link>
+              Back to Workspace
+            </span>
+          </Link>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 pt-2">
+          <div
+            className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8] transition-all duration-300 ${
+              expanded ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            Project
           </div>
 
-          {/* Nav items */}
-          <nav style={{ flex:1, overflowY:"auto", padding:"4px 10px" }}>
-            {navItems.map(item => {
-              const active = pathname === item.href || (item.href !== `/app/projects/${projectId}` && pathname.startsWith(item.href));
-              const Icon = item.icon;
-              return (
-                <Link key={item.href} href={item.href} style={{
-                  display:"flex", alignItems:"center", height:44, borderRadius:10, padding:"0 12px", marginBottom:2,
-                  background: active ? "rgba(255,255,255,0.15)" : "transparent",
-                  color: active ? "#ffffff" : "rgba(255,255,255,0.6)",
-                  textDecoration:"none", fontWeight: active ? 600 : 500, fontSize:14,
-                  transition:"background 150ms",
-                }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background="rgba(255,255,255,0.08)"; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background="transparent"; }}
+          {navItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== `/app/projects/${projectId}` &&
+                pathname.startsWith(item.href));
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`mb-1 flex h-12 items-center rounded-xl px-3 text-[14px] transition ${
+                  active
+                    ? "border border-[#e6eaf2] bg-[#f8fafc] text-[#111827] shadow-sm"
+                    : "text-[#64748b] hover:bg-[#f5f7fb] hover:text-[#111827]"
+                }`}
+              >
+                <Icon
+                  className={`h-[18px] w-[18px] shrink-0 ${
+                    active ? "text-[#111827]" : "text-[#94a3b8]"
+                  }`}
+                />
+                <span
+                  className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+                    expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+                  }`}
                 >
-                  <Icon style={{ height:18, width:18, flexShrink:0, color: active ? "#ffffff" : "rgba(255,255,255,0.55)" }}/>
-                  <span style={{ overflow:"hidden", whiteSpace:"nowrap", marginLeft: expanded ? 12 : 0, width: expanded ? "auto" : 0, opacity: expanded ? 1 : 0, transition:"all 280ms" }}>
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* Bottom: settings + logout + user */}
-          <div style={{ padding:"4px 10px 16px", borderTop:"1px solid rgba(255,255,255,0.08)", flexShrink:0 }}>
-            <Link href={`/app/projects/${projectId}/settings`} style={{
-              display:"flex", alignItems:"center", height:44, borderRadius:10, padding:"0 12px", marginBottom:2,
-              color:"rgba(255,255,255,0.55)", textDecoration:"none", fontSize:14, fontWeight:500, transition:"background 150ms",
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background="rgba(255,255,255,0.08)")}
-              onMouseLeave={e => (e.currentTarget.style.background="transparent")}
+        <div className="border-t border-[#eef1f6] px-3 pt-4 pb-4">
+          <div
+            className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#94a3b8] transition-all duration-300 ${
+              expanded ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            Management
+          </div>
+
+          {bottomItems.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== `/app/projects/${projectId}` &&
+                pathname.startsWith(item.href));
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`mb-1 flex h-12 items-center rounded-xl px-3 text-[14px] transition ${
+                  active
+                    ? "border border-[#e6eaf2] bg-[#f8fafc] text-[#111827] shadow-sm"
+                    : "text-[#64748b] hover:bg-[#f5f7fb] hover:text-[#111827]"
+                }`}
+              >
+                <Icon
+                  className={`h-[18px] w-[18px] shrink-0 ${
+                    active ? "text-[#111827]" : "text-[#94a3b8]"
+                  }`}
+                />
+                <span
+                  className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+                    expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="mt-3 flex h-12 w-full items-center rounded-xl px-3 text-[14px] text-[#64748b] transition hover:bg-[#f5f7fb] hover:text-[#111827]"
+          >
+            <LogOut className="h-[18px] w-[18px] shrink-0 text-[#94a3b8]" />
+            <span
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+                expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+              }`}
             >
-              <Settings style={{ height:18, width:18, flexShrink:0, color:"rgba(255,255,255,0.4)" }}/>
-              <span style={{ overflow:"hidden", whiteSpace:"nowrap", marginLeft: expanded ? 12 : 0, width: expanded ? "auto" : 0, opacity: expanded ? 1 : 0, transition:"all 280ms" }}>Settings</span>
-            </Link>
+              {loggingOut ? "Logging out..." : "Log out"}
+            </span>
+          </button>
 
-            <button onClick={handleLogout} disabled={loggingOut} style={{
-              display:"flex", alignItems:"center", height:44, borderRadius:10, padding:"0 12px", marginBottom:4,
-              background:"transparent", border:"none", cursor:"pointer", width:"100%", fontSize:14, fontWeight:500,
-              color:"rgba(255,255,255,0.55)", transition:"background 150ms",
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background="rgba(255,255,255,0.08)")}
-              onMouseLeave={e => (e.currentTarget.style.background="transparent")}
-            >
-              <LogOut style={{ height:18, width:18, flexShrink:0, color:"rgba(255,255,255,0.4)" }}/>
-              <span style={{ overflow:"hidden", whiteSpace:"nowrap", marginLeft: expanded ? 12 : 0, width: expanded ? "auto" : 0, opacity: expanded ? 1 : 0, transition:"all 280ms" }}>
-                {loggingOut ? "Logging out..." : "Log out"}
-              </span>
-            </button>
+          <div className="mt-4 rounded-2xl border border-[#edf0f5] bg-[#fcfcfd] p-3">
+            <div className="flex items-center">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name || "User"}
+                  className="h-9 w-9 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#111827] text-[12px] font-semibold text-white">
+                  {(profile?.full_name || "R").slice(0, 1).toUpperCase()}
+                </div>
+              )}
 
-            {/* User avatar */}
-            <div style={{ display:"flex", alignItems:"center", height:44, borderRadius:10, padding:"0 10px" }}>
-              {profile?.avatar_url
-                ? <img src={profile.avatar_url} alt={profile.full_name||"User"} style={{ height:28, width:28, borderRadius:"50%", objectFit:"cover", flexShrink:0 }}/>
-                : <div style={{ height:28, width:28, borderRadius:"50%", background:"#7c3aed", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"white", flexShrink:0 }}>
-                    {(profile?.full_name||"R").slice(0,1).toUpperCase()}
-                  </div>
-              }
-              <div style={{ overflow:"hidden", transition:"all 280ms", marginLeft: expanded ? 10 : 0, width: expanded ? "auto" : 0, opacity: expanded ? 1 : 0 }}>
-                <p style={{ whiteSpace:"nowrap", fontSize:13, fontWeight:600, color:"#ffffff", maxWidth:160, overflow:"hidden", textOverflow:"ellipsis" }}>{profile?.full_name||"User"}</p>
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  expanded ? "ml-3 w-auto opacity-100" : "ml-0 w-0 opacity-0"
+                }`}
+              >
+                <p className="max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold text-[#111827]">
+                  {profile?.full_name || "User"}
+                </p>
+                <p className="text-[11px] text-[#94a3b8]">Workspace member</p>
               </div>
             </div>
           </div>
-
-        </div>{/* end dark purple section */}
+        </div>
       </aside>
 
-      {/* ── MAIN AREA ── */}
-      <div style={{ display:"flex", flexDirection:"column", flex:1, overflow:"hidden", minWidth:0 }}>
-        {/* Header */}
-        <header style={{ height:72, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"space-between", borderBottom:"1px solid #e8eaf0", background:"#ffffff", padding:"0 28px", zIndex:20 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, minWidth:0, flex:1 }}>
-            <Link href="/app" style={{ fontSize:14, color:"#94a3b8", textDecoration:"none" }}
-              onMouseEnter={e=>(e.currentTarget.style.color="#374151")}
-              onMouseLeave={e=>(e.currentTarget.style.color="#94a3b8")}>Workspace</Link>
-            <span style={{ color:"#e2e8f0" }}>/</span>
-            <span style={{ fontSize:15, fontWeight:600, color:"#1e293b", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{project?.name}</span>
-            <span style={{ padding:"2px 10px", borderRadius:20, fontSize:12, fontWeight:600, flexShrink:0 }} className={getStatusClasses(project?.status??null)}>
-              {getStatusLabel(project?.status??null)}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-20 flex h-[76px] shrink-0 items-center justify-between border-b border-[#e8ebf2] bg-white px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Link
+              href="/app"
+              className="text-[14px] text-[#94a3b8] transition hover:text-[#111827]"
+            >
+              Workspace
+            </Link>
+
+            <span className="text-[#d1d5db]">/</span>
+
+            <span className="truncate text-[15px] font-semibold text-[#111827]">
+              {project?.name}
             </span>
-            <ChevronDown style={{ height:16, width:16, color:"#94a3b8", flexShrink:0 }}/>
+
+            <span
+              className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${getStatusClasses(
+                project?.status ?? null
+              )}`}
+            >
+              {getStatusLabel(project?.status ?? null)}
+            </span>
           </div>
 
-          <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
-            <Link href={`/app/projects/${projectId}/notifications`} style={{
-              position:"relative", display:"flex", alignItems:"center", justifyContent:"center",
-              height:40, width:40, borderRadius:10, border:"1px solid #e8eaf0", background:"white", color:"#64748b", textDecoration:"none",
-            }}>
-              <Bell style={{ height:18, width:18 }}/>
+          <div className="flex shrink-0 items-center gap-3">
+            <Link
+              href={`/app/projects/${projectId}/notifications`}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#e8ebf2] bg-white text-[#64748b] transition hover:bg-[#f8fafc]"
+            >
+              <Bell className="h-[18px] w-[18px]" />
               {unreadCount > 0 && (
-                <span style={{ position:"absolute", top:-4, right:-4, height:18, minWidth:18, borderRadius:9, background:"#ef4444", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", padding:"0 4px" }}>
+                <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
             </Link>
 
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"6px 12px", borderRadius:10, border:"1px solid #e8eaf0", background:"white" }}>
-              {profile?.avatar_url
-                ? <img src={profile.avatar_url} alt={profile.full_name||"User"} style={{ height:32, width:32, borderRadius:"50%", objectFit:"cover" }}/>
-                : <div style={{ height:32, width:32, borderRadius:"50%", background:"#7c3aed", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"white" }}>
-                    {(profile?.full_name||"R").slice(0,1).toUpperCase()}
-                  </div>
-              }
-              <span style={{ fontSize:14, fontWeight:600, color:"#374151" }} className="hidden sm:block">{profile?.full_name||"User"}</span>
-              <ChevronDown style={{ height:14, width:14, color:"#94a3b8" }}/>
+            <div className="flex items-center gap-3 rounded-xl border border-[#e8ebf2] bg-white px-3 py-2">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name || "User"}
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#111827] text-[12px] font-semibold text-white">
+                  {(profile?.full_name || "R").slice(0, 1).toUpperCase()}
+                </div>
+              )}
+
+              <span className="hidden text-[14px] font-semibold text-[#111827] sm:block">
+                {profile?.full_name || "User"}
+              </span>
+
+              <ChevronDown className="h-4 w-4 text-[#94a3b8]" />
             </div>
           </div>
         </header>
 
-        <main style={{ flex:1, overflowY:"auto", minWidth:0 }}>{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

@@ -15,6 +15,9 @@ import {
   ChevronDown,
   Trash2,
   Camera,
+  PencilRuler,
+  Upload,
+  Link2,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -79,6 +82,8 @@ type WorkspaceInsight = {
   ctaLabel?: string;
   projectId?: string;
 };
+
+type StartMethod = "scratch" | "import" | "connect";
 
 const AVATAR_COLORS = [
   "bg-violet-500",
@@ -254,10 +259,6 @@ function buildWorkspaceInsights(params: {
       const s = (a.status ?? "").toLowerCase();
       return s !== "done" && isOverdue(a.due_date);
     }).length;
-    const openActions = actions.filter((a) => {
-      const s = (a.status ?? "").toLowerCase();
-      return s === "open" || s === "in_progress" || s === "blocked" || s === "overdue" || !s;
-    }).length;
     const upcomingReviews = risks.filter((r) => {
       if (!r.due_review_date) return false;
       const d = new Date(r.due_review_date).getTime();
@@ -270,7 +271,6 @@ function buildWorkspaceInsights(params: {
       highRisks,
       openRisks,
       overdueActions,
-      openActions,
       upcomingReviews,
       staleDays,
       memberCount: members.length,
@@ -322,13 +322,13 @@ function buildWorkspaceInsights(params: {
     });
   }
 
-  const coverageGap = facts.find((x) => x.memberCount === 0 && (x.openRisks > 0 || x.openActions > 0));
+  const coverageGap = facts.find((x) => x.memberCount === 0 && x.openRisks > 0);
   if (coverageGap) {
     insights.push({
       id: `coverage-${coverageGap.project.id}`,
       severity: "info",
       title: "Team coverage missing",
-      description: `${coverageGap.project.name} has active risks or actions but no linked project members yet.`,
+      description: `${coverageGap.project.name} has active risks but no linked project members yet.`,
       projectId: coverageGap.project.id,
       ctaLabel: "Open project",
       stat: "0 linked",
@@ -349,18 +349,12 @@ function buildWorkspaceInsights(params: {
   }
 
   if (!insights.length) {
-    const totalOpenRisks = facts.reduce((sum, x) => sum + x.openRisks, 0);
-    const totalOverdue = facts.reduce((sum, x) => sum + x.overdueActions, 0);
-
     insights.push({
       id: "healthy",
       severity: "positive",
       title: "Workspace looks healthy",
-      description:
-        totalOpenRisks > 0
-          ? `Projects are active and no urgent control gaps were detected. ${totalOpenRisks} open risks are currently being tracked.`
-          : "No urgent gaps detected. Add more project data to unlock deeper recommendations.",
-      stat: totalOverdue > 0 ? `${totalOverdue} overdue` : "Stable",
+      description: "No urgent control gaps detected. Add more project data to unlock deeper recommendations.",
+      stat: "Stable",
     });
   }
 
@@ -371,7 +365,7 @@ function Illustration({ type }: { type: PType }) {
   switch (type) {
     case "construction":
       return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <svg viewBox="0 0 280 176" fill="none" className="h-full w-full">
           <ellipse cx="140" cy="155" rx="95" ry="11" fill="#c4b8e8" opacity="0.45" />
           <rect x="82" y="88" width="78" height="67" rx="3" fill="#7c6ec0" />
           <rect x="87" y="93" width="15" height="19" rx="2" fill="#b0a0e0" />
@@ -389,101 +383,9 @@ function Illustration({ type }: { type: PType }) {
           <rect x="166" y="88" width="6" height="67" rx="1" fill="#c0b0e0" />
         </svg>
       );
-    case "tunnel":
-      return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <ellipse cx="140" cy="158" rx="108" ry="10" fill="#9ab8d8" opacity="0.4" />
-          <rect x="55" y="118" width="170" height="42" rx="2" fill="#7a9ab8" />
-          <rect x="128" y="121" width="24" height="7" rx="1" fill="white" opacity="0.5" />
-          <rect x="128" y="133" width="24" height="7" rx="1" fill="white" opacity="0.5" />
-          <path d="M 55 158 L 55 95 Q 55 38 140 38 Q 225 38 225 95 L 225 158 Z" fill="#5a7a9a" />
-          <path d="M 72 158 L 72 98 Q 72 55 140 55 Q 208 55 208 98 L 208 158 Z" fill="#1a2a3a" />
-          <ellipse cx="140" cy="142" rx="38" ry="18" fill="#f0e060" opacity="0.12" />
-          <ellipse cx="42" cy="108" rx="17" ry="21" fill="#4caf82" />
-          <rect x="39" y="127" width="6" height="14" fill="#8B6914" />
-          <ellipse cx="238" cy="108" rx="17" ry="21" fill="#3d9e6e" />
-          <rect x="235" y="127" width="6" height="14" fill="#8B6914" />
-          <circle cx="88" cy="78" r="4" fill="#fff8c0" opacity="0.8" />
-          <circle cx="192" cy="78" r="4" fill="#fff8c0" opacity="0.8" />
-        </svg>
-      );
-    case "tower":
-      return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <ellipse cx="140" cy="158" rx="88" ry="10" fill="#9ab0c8" opacity="0.4" />
-          <rect x="108" y="28" width="64" height="130" rx="3" fill="#4a6080" />
-          <rect x="108" y="28" width="18" height="130" rx="3" fill="#5a7090" opacity="0.5" />
-          <rect x="115" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="130" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="145" y="38" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9" />
-          <rect x="160" y="38" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="115" y="56" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9" />
-          <rect x="130" y="56" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="145" y="56" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="160" y="56" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9" />
-          <rect x="115" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="130" y="74" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9" />
-          <rect x="145" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="160" y="74" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="115" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="130" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="145" y="92" width="10" height="12" rx="1" fill="#2a3a50" opacity="0.9" />
-          <rect x="160" y="92" width="10" height="12" rx="1" fill="#a0d4f8" opacity="0.9" />
-          <rect x="136" y="13" width="8" height="18" rx="1" fill="#8090a0" />
-          <circle cx="140" cy="12" r="3" fill="#e05050" />
-          <rect x="68" y="98" width="30" height="60" rx="2" fill="#6a80a0" />
-          <rect x="182" y="108" width="28" height="50" rx="2" fill="#5a7090" />
-          <rect x="70" y="101" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7" />
-          <rect x="83" y="101" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7" />
-          <rect x="184" y="111" width="8" height="10" rx="1" fill="#90c0e0" opacity="0.7" />
-        </svg>
-      );
-    case "wind":
-      return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <ellipse cx="140" cy="158" rx="110" ry="10" fill="#88c8a8" opacity="0.3" />
-          <ellipse cx="140" cy="155" rx="118" ry="18" fill="#4a9e6a" opacity="0.25" />
-          <rect x="136" y="68" width="8" height="90" rx="2" fill="#d8dce0" />
-          <circle cx="140" cy="66" r="5" fill="#c0c4c8" />
-          <path d="M140 61 L145 28 L135 28 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5" />
-          <path d="M145 69 L176 79 L169 67 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5" />
-          <path d="M135 69 L104 79 L111 67 Z" fill="#e8ecf0" stroke="#c0c4c8" strokeWidth="0.5" />
-          <rect x="74" y="88" width="6" height="70" rx="2" fill="#d0d4d8" />
-          <circle cx="77" cy="86" r="4" fill="#b8bcc0" />
-          <path d="M77 82 L81 58 L73 58 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <path d="M81 89 L103 96 L98 86 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <path d="M73 89 L51 96 L56 86 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <rect x="200" y="93" width="6" height="65" rx="2" fill="#d0d4d8" />
-          <circle cx="203" cy="91" r="4" fill="#b8bcc0" />
-          <path d="M203 87 L207 65 L199 65 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <path d="M207 94 L227 101 L222 91 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <path d="M199 94 L179 101 L184 91 Z" fill="#e0e4e8" stroke="#b8bcc0" strokeWidth="0.5" />
-          <ellipse cx="47" cy="136" rx="13" ry="17" fill="#3d8a58" />
-          <ellipse cx="241" cy="139" rx="11" ry="14" fill="#4a9e6a" />
-        </svg>
-      );
-    case "renovation":
-      return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <ellipse cx="140" cy="158" rx="100" ry="10" fill="#d4c8b8" opacity="0.5" />
-          <path d="M88 122 Q88 78 140 73 Q192 78 192 122 Z" fill="#f0b429" />
-          <rect x="80" y="120" width="120" height="12" rx="4" fill="#e0a018" />
-          <rect x="74" y="126" width="132" height="8" rx="4" fill="#f0b429" />
-          <path d="M93 132 Q140 147 187 132" stroke="#c89010" strokeWidth="3" fill="none" />
-          <rect x="113" y="137" width="54" height="8" rx="3" fill="#90b8e0" />
-          <circle cx="113" cy="141" r="8" fill="#a0c8f0" />
-          <circle cx="167" cy="141" r="8" fill="#a0c8f0" />
-          <line x1="118" y1="138" x2="162" y2="138" stroke="white" strokeWidth="1" opacity="0.6" />
-          <line x1="118" y1="141" x2="162" y2="141" stroke="white" strokeWidth="1" opacity="0.6" />
-          <line x1="118" y1="144" x2="162" y2="144" stroke="white" strokeWidth="1" opacity="0.6" />
-          <path d="M170 98 L186 114 L184 116 L168 100 Z" fill="#8090a0" />
-          <circle cx="166" cy="101" r="10" fill="none" stroke="#8090a0" strokeWidth="4" />
-          <circle cx="188" cy="113" r="7" fill="none" stroke="#8090a0" strokeWidth="4" />
-        </svg>
-      );
     case "planning":
       return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <svg viewBox="0 0 280 176" fill="none" className="h-full w-full">
           <ellipse cx="140" cy="158" rx="88" ry="10" fill="#c0b8e0" opacity="0.4" />
           <rect x="83" y="38" width="114" height="122" rx="6" fill="#f0eef8" stroke="#c0b0e0" strokeWidth="2" />
           <rect x="113" y="31" width="54" height="18" rx="6" fill="#a090d0" />
@@ -494,63 +396,26 @@ function Illustration({ type }: { type: PType }) {
           <rect x="96" y="82" width="88" height="8" rx="2" fill="#e0daf0" />
           <circle cx="103" cy="86" r="5" fill="#7c6ec0" />
           <path d="M100 86 L102 88 L106 84" stroke="white" strokeWidth="1.5" fill="none" />
-          <rect x="96" y="98" width="88" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1" />
-          <circle cx="103" cy="102" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5" />
-          <rect x="96" y="114" width="55" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1" />
-          <circle cx="103" cy="118" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5" />
-          <rect x="96" y="130" width="40" height="8" rx="2" fill="#f0eef8" stroke="#d0c8e8" strokeWidth="1" />
-          <circle cx="103" cy="134" r="5" fill="none" stroke="#9080c0" strokeWidth="1.5" />
           <path d="M164 102 L176 135 L163 128 Z" fill="#5060a0" />
           <rect x="170" y="97" width="8" height="10" rx="2" transform="rotate(20 170 97)" fill="#303060" />
         </svg>
       );
-    case "water":
+    case "renovation":
       return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <path d="M30 128 Q70 116 110 128 Q150 140 190 128 Q230 116 260 128 L260 166 L30 166 Z" fill="#3a80a8" opacity="0.75" />
-          <path d="M30 138 Q80 128 130 138 Q180 148 230 138 L260 138 L260 166 L30 166 Z" fill="#2a6898" opacity="0.6" />
-          <rect x="58" y="88" width="164" height="12" rx="3" fill="#7a8898" />
-          <rect x="88" y="98" width="12" height="52" rx="2" fill="#6a7888" />
-          <rect x="180" y="98" width="12" height="52" rx="2" fill="#6a7888" />
-          <path d="M58 88 Q140 52 222 88" stroke="#8898a8" strokeWidth="6" fill="none" />
-          <path d="M58 88 Q140 57 222 88" stroke="#9aaab8" strokeWidth="3" fill="none" />
-          <line x1="140" y1="60" x2="98" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7" />
-          <line x1="140" y1="60" x2="118" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7" />
-          <line x1="140" y1="60" x2="162" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7" />
-          <line x1="140" y1="60" x2="182" y2="88" stroke="#aabac8" strokeWidth="1.5" opacity="0.7" />
-          <path d="M48 140 Q78 134 108 140" stroke="white" strokeWidth="1.5" fill="none" opacity="0.4" />
-          <path d="M162 136 Q192 130 222 136" stroke="white" strokeWidth="1.5" fill="none" opacity="0.4" />
-        </svg>
-      );
-    case "energy":
-      return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
-          <rect x="68" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="110" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="152" y="48" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="68" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="110" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="152" y="86" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="68" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="110" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <rect x="152" y="124" width="36" height="30" rx="2" fill="#1a3a6a" stroke="#2a5090" strokeWidth="1" />
-          <line x1="68" y1="63" x2="104" y2="63" stroke="#2a5090" strokeWidth="0.8" />
-          <line x1="110" y1="63" x2="146" y2="63" stroke="#2a5090" strokeWidth="0.8" />
-          <line x1="152" y1="63" x2="188" y2="63" stroke="#2a5090" strokeWidth="0.8" />
-          <line x1="86" y1="48" x2="86" y2="78" stroke="#2a5090" strokeWidth="0.8" />
-          <line x1="128" y1="48" x2="128" y2="78" stroke="#2a5090" strokeWidth="0.8" />
-          <line x1="170" y1="48" x2="170" y2="78" stroke="#2a5090" strokeWidth="0.8" />
-          <circle cx="228" cy="42" r="22" fill="#f0d040" opacity="0.9" />
-          <line x1="228" y1="14" x2="228" y2="8" stroke="#f0d040" strokeWidth="2.5" opacity="0.7" />
-          <line x1="228" y1="70" x2="228" y2="76" stroke="#f0d040" strokeWidth="2.5" opacity="0.7" />
-          <line x1="200" y1="42" x2="194" y2="42" stroke="#f0d040" strokeWidth="2.5" opacity="0.7" />
-          <line x1="246" y1="22" x2="250" y2="18" stroke="#f0d040" strokeWidth="2.5" opacity="0.7" />
-          <line x1="210" y1="22" x2="206" y2="18" stroke="#f0d040" strokeWidth="2.5" opacity="0.7" />
+        <svg viewBox="0 0 280 176" fill="none" className="h-full w-full">
+          <ellipse cx="140" cy="158" rx="100" ry="10" fill="#d4c8b8" opacity="0.5" />
+          <path d="M88 122 Q88 78 140 73 Q192 78 192 122 Z" fill="#f0b429" />
+          <rect x="80" y="120" width="120" height="12" rx="4" fill="#e0a018" />
+          <rect x="74" y="126" width="132" height="8" rx="4" fill="#f0b429" />
+          <path d="M93 132 Q140 147 187 132" stroke="#c89010" strokeWidth="3" fill="none" />
+          <path d="M170 98 L186 114 L184 116 L168 100 Z" fill="#8090a0" />
+          <circle cx="166" cy="101" r="10" fill="none" stroke="#8090a0" strokeWidth="4" />
+          <circle cx="188" cy="113" r="7" fill="none" stroke="#8090a0" strokeWidth="4" />
         </svg>
       );
     default:
       return (
-        <svg viewBox="0 0 280 176" fill="none" className="w-full h-full">
+        <svg viewBox="0 0 280 176" fill="none" className="h-full w-full">
           <ellipse cx="140" cy="155" rx="95" ry="11" fill="#c4b8e8" opacity="0.45" />
           <rect x="82" y="88" width="78" height="67" rx="3" fill="#7c6ec0" />
           <rect x="87" y="93" width="15" height="19" rx="2" fill="#b0a0e0" />
@@ -561,8 +426,6 @@ function Illustration({ type }: { type: PType }) {
           <rect x="129" y="119" width="23" height="36" rx="2" fill="#6a5eb0" />
           <rect x="153" y="22" width="8" height="133" rx="2" fill="#f0b429" />
           <rect x="122" y="22" width="70" height="8" rx="2" fill="#f0b429" />
-          <line x1="171" y1="30" x2="171" y2="73" stroke="#999" strokeWidth="1.5" />
-          <rect x="164" y="71" width="14" height="10" rx="2" fill="#e05050" />
         </svg>
       );
   }
@@ -570,7 +433,7 @@ function Illustration({ type }: { type: PType }) {
 
 function StatPill({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm whitespace-nowrap">
+    <div className="whitespace-nowrap rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm flex items-center gap-2">
       {icon}
       {label}
     </div>
@@ -613,7 +476,7 @@ function RiskScorePill({ score, level }: { score: number | null; level: string |
   const { bg, label } = getRiskStyle(level, score);
   if (score === null && !level) return null;
   return (
-    <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold text-white ${bg}`}>
+    <div className={`rounded-lg px-2.5 py-1 text-xs font-bold text-white flex items-center gap-1.5 ${bg}`}>
       <span>{score ?? 0}</span>
       <span className="font-normal opacity-90">{label}</span>
     </div>
@@ -651,24 +514,24 @@ function CardImage({
   }
 
   return (
-    <div className="relative h-44 flex items-center justify-center overflow-hidden" style={{ background: TYPE_BG[type] }}>
+    <div className="relative h-40 overflow-hidden flex items-center justify-center" style={{ background: TYPE_BG[type] }}>
       {project.image_url ? (
-        <img src={project.image_url} alt={project.name} className="w-full h-full object-cover" />
+        <img src={project.image_url} alt={project.name} className="h-full w-full object-cover" />
       ) : (
-        <div className="w-full h-full">
+        <div className="h-full w-full">
           <Illustration type={type} />
         </div>
       )}
 
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
         <button
           type="button"
           onClick={handleCameraClick}
-          className="pointer-events-auto bg-white/90 rounded-full p-2.5 shadow-lg hover:bg-white transition-colors"
+          className="pointer-events-auto rounded-full bg-white/90 p-2.5 shadow-lg transition-colors hover:bg-white"
           title="Afbeelding wijzigen"
         >
           {uploading ? (
-            <div className="h-5 w-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
           ) : (
             <Camera className="h-5 w-5 text-slate-700" />
           )}
@@ -698,7 +561,7 @@ function ProjectsPageContent() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const [intakeMethod, setIntakeMethod] = useState<"manual" | "csv" | "api">("manual");
+  const [startMethod, setStartMethod] = useState<StartMethod>("scratch");
 
   const workspaceFromUrl = searchParams.get("workspace");
 
@@ -719,7 +582,6 @@ function ProjectsPageContent() {
         }
 
         const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
-
         const fullName = profile?.full_name ?? "You";
 
         const { data: memberships, error: me } = await supabase
@@ -738,7 +600,8 @@ function ProjectsPageContent() {
 
         const storedId = typeof window !== "undefined" ? localStorage.getItem("active_workspace_id") : null;
         const requestedId = workspaceFromUrl || storedId || null;
-        const active = (requestedId ? membershipList.find((m) => m.workspace_id === requestedId) : null) ?? membershipList[0];
+        const active =
+          (requestedId ? membershipList.find((m) => m.workspace_id === requestedId) : null) ?? membershipList[0];
 
         if (!active?.workspace_id) {
           router.push("/onboarding");
@@ -782,7 +645,6 @@ function ProjectsPageContent() {
             .order("updated_at", { ascending: false });
 
           if (pe2) throw pe2;
-
           projs = ((pd2 ?? []) as any[]).map((p) => ({ ...p, image_url: null }));
         } else {
           projs = ((pd ?? []) as any[]).map((p) => ({ ...p, image_url: p.image_url ?? null }));
@@ -947,8 +809,8 @@ function ProjectsPageContent() {
     const level = risks.some((r) => (r.level ?? "").toLowerCase() === "high")
       ? "high"
       : risks.some((r) => ["moderate", "medium"].includes((r.level ?? "").toLowerCase()))
-        ? "moderate"
-        : "low";
+      ? "moderate"
+      : "low";
 
     return { score: avg, level };
   }
@@ -980,7 +842,7 @@ function ProjectsPageContent() {
   function openModal() {
     setMessage("");
     setProjectName("");
-    setIntakeMethod("manual");
+    setStartMethod("scratch");
     setShowCreateModal(true);
   }
 
@@ -1006,6 +868,9 @@ function ProjectsPageContent() {
 
       if (ue || !user) throw new Error("No user found.");
 
+      const intakeMethod =
+        startMethod === "scratch" ? "manual" : startMethod === "import" ? "csv" : "api";
+
       const { data: project, error: pe } = await supabase
         .from("projects")
         .insert({
@@ -1022,18 +887,20 @@ function ProjectsPageContent() {
       if (pe) throw pe;
       if (!project) throw new Error("Could not create.");
 
-      await supabase.from("project_members").insert({
-        project_id: project.id,
-        user_id: user.id,
-        role: "owner",
-      });
-
       setProjects((prev) => [{ ...(project as any), image_url: null } as Project, ...prev]);
       setShowCreateModal(false);
 
-      if (intakeMethod === "manual") router.push(`/app/projects/${project.id}/intake/step-1`);
-      else if (intakeMethod === "csv") router.push(`/app/projects/${project.id}/import/csv`);
-      else router.push(`/app/projects/${project.id}/import/api`);
+      if (startMethod === "scratch") {
+        router.push(`/intake/${project.id}/step-1`);
+        return;
+      }
+
+      if (startMethod === "import") {
+        router.push(`/app/projects/${project.id}/import/csv`);
+        return;
+      }
+
+      router.push(`/app/projects/${project.id}/import/api`);
     } catch (err: any) {
       setMessage(err?.message || "Could not create project.");
     } finally {
@@ -1081,25 +948,48 @@ function ProjectsPageContent() {
     router.push(`/app/projects/${projectId}?workspace=${workspaceId}`);
   }
 
+  const startOptions = [
+    {
+      value: "scratch" as StartMethod,
+      title: "Start from Scratch",
+      description: "Set up a new project manually and build your risk environment from the ground up.",
+      icon: PencilRuler,
+    },
+    {
+      value: "import" as StartMethod,
+      title: "Import Existing Data",
+      description: "Bring in existing project information from spreadsheets or exported files.",
+      icon: Upload,
+    },
+    {
+      value: "connect" as StartMethod,
+      title: "Connect Existing Systems",
+      description: "Connect data from current tools and keep project information in sync.",
+      icon: Link2,
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flex: 1, overflow: "hidden", background: "#f7f7fb" }}>
       <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
-        <div className="flex items-start justify-between px-8 pt-8 pb-4">
-          <div>
-            <h1 className="text-[32px] font-bold tracking-tight text-slate-900">Projects</h1>
-            <p className="mt-1 text-[15px] text-slate-500">
-              Track project risks, actions and team updates across your workspace
-            </p>
-          </div>
+        <div className="px-8 pt-8 pb-5">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <h1 className="text-[34px] font-bold tracking-tight text-slate-900">Projects</h1>
+              <p className="mt-1 text-[15px] text-slate-500">
+                Track project risks, actions and team updates across your workspace
+              </p>
+            </div>
 
-          <button
-            onClick={openModal}
-            disabled={!workspaceId}
-            className="flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
-          >
-            <Plus className="h-4 w-4" />
-            Create Project
-          </button>
+            <button
+              onClick={openModal}
+              disabled={!workspaceId}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" />
+              Create Project
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 px-8 pb-5">
@@ -1118,7 +1008,7 @@ function ProjectsPageContent() {
           <StatPill icon={<Clock className="h-4 w-4 text-amber-400" />} label={`${actionsDue} Actions Due`} />
         </div>
 
-        <div className="px-8 pb-4">
+        <div className="px-8 pb-5">
           <div className="relative max-w-sm">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -1138,9 +1028,9 @@ function ProjectsPageContent() {
 
         <div className="px-8 pb-10">
           {loading ? (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-[360px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
+                <div key={i} className="h-[320px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
               ))}
             </div>
           ) : filteredProjects.length === 0 ? (
@@ -1159,8 +1049,8 @@ function ProjectsPageContent() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {filteredProjects.map((project) => {
+            <div className="grid max-w-[1180px] grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+              {filteredProjects.map((project, index) => {
                 const members = projectMembers[project.id] ?? [];
                 const { score, level } = getProjectScore(project.id);
                 const status = getStatusBadge(project.status);
@@ -1171,26 +1061,24 @@ function ProjectsPageContent() {
                 return (
                   <div
                     key={project.id}
-                    className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-xl hover:-translate-y-1 cursor-default"
+                    className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl"
                   >
-                    <CardImage
-                      project={project}
-                      onUpload={handleUploadImage}
-                      projectIndex={filteredProjects.indexOf(project)}
-                    />
+                    <CardImage project={project} onUpload={handleUploadImage} projectIndex={index} />
 
                     {critCount > 0 && (
-                      <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white shadow z-10">
+                      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white shadow">
                         <AlertTriangle className="h-3 w-3" />
                         {critCount}
                       </div>
                     )}
 
                     <div
-                      className="p-4 pb-3 cursor-pointer"
+                      className="cursor-pointer p-4 pb-3"
                       onClick={() => router.push(`/app/projects/${project.id}?workspace=${workspaceId}`)}
                     >
-                      <h3 className="text-[17px] font-bold text-slate-900 leading-tight truncate">{project.name}</h3>
+                      <h3 className="truncate text-[17px] font-bold leading-tight text-slate-900">
+                        {project.name}
+                      </h3>
 
                       <div className="mt-1.5 flex items-center gap-2">
                         <span className="text-sm text-slate-700">
@@ -1215,7 +1103,7 @@ function ProjectsPageContent() {
                     </div>
 
                     <div
-                      className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 cursor-pointer"
+                      className="cursor-pointer flex items-center justify-between border-t border-slate-100 px-4 py-2.5"
                       onClick={() => router.push(`/app/projects/${project.id}?workspace=${workspaceId}`)}
                     >
                       <span className="text-[12px] text-slate-400">
@@ -1228,7 +1116,7 @@ function ProjectsPageContent() {
                       </div>
                     </div>
 
-                    <div className="hidden group-hover:flex items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                    <div className="hidden items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 group-hover:flex">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1261,7 +1149,7 @@ function ProjectsPageContent() {
 
       <aside
         style={{
-          width: 288,
+          width: 300,
           flexShrink: 0,
           borderLeft: "1px solid #e2e8f0",
           background: "#f7f7fb",
@@ -1271,7 +1159,7 @@ function ProjectsPageContent() {
       >
         <div className="flex flex-col gap-6 p-5">
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex items-center justify-between">
               <h2 className="text-[15px] font-bold text-slate-900">Workspace Activity</h2>
               <button className="text-slate-400 hover:text-slate-600">
                 <Settings className="h-4 w-4" />
@@ -1284,9 +1172,9 @@ function ProjectsPageContent() {
               ) : (
                 activityItems.map((item) => (
                   <div key={item.id} className="flex gap-3">
-                    <div className="relative flex-shrink-0">
+                    <div className="relative shrink-0">
                       <div
-                        className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${item.avatarColor}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${item.avatarColor}`}
                       >
                         {item.actorInitials}
                       </div>
@@ -1297,7 +1185,7 @@ function ProjectsPageContent() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-slate-700 leading-snug">
+                      <p className="leading-snug text-[13px] text-slate-700">
                         <span className="font-semibold">{item.actor}</span>{" "}
                         <span dangerouslySetInnerHTML={{ __html: item.message }} />
                         {item.project && <span className="text-slate-400"> in {item.project}</span>}
@@ -1311,13 +1199,13 @@ function ProjectsPageContent() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-violet-500" />
                 <h2 className="text-[14px] font-bold text-slate-900">Risk Insights</h2>
               </div>
 
-              <button className="text-[11px] text-violet-600 font-medium flex items-center gap-0.5">
+              <button className="flex items-center gap-0.5 text-[11px] font-medium text-violet-600">
                 Auto-refresh
                 <ChevronRight className="h-3 w-3" />
               </button>
@@ -1337,7 +1225,7 @@ function ProjectsPageContent() {
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2">
                           <div
-                            className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded ${tone.iconWrap}`}
+                            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded ${tone.iconWrap}`}
                           >
                             <Sparkles className={`h-3.5 w-3.5 ${tone.iconColor}`} />
                           </div>
@@ -1370,7 +1258,7 @@ function ProjectsPageContent() {
               )}
             </div>
 
-            <button className="mt-3 w-full text-center text-[12px] font-semibold text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1">
+            <button className="mt-3 flex w-full items-center justify-center gap-1 text-center text-[12px] font-semibold text-slate-500 hover:text-slate-700">
               Show more
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -1385,75 +1273,67 @@ function ProjectsPageContent() {
             if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="w-full max-w-[520px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+          <div className="w-full max-w-[720px] rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]">
+            <div className="flex items-start justify-between border-b border-slate-100 px-7 py-6">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">New Project</h3>
-                <p className="mt-0.5 text-sm text-slate-500">Set up your project in seconds</p>
+                <h3 className="text-[30px] font-bold tracking-tight text-slate-900">Create New Project</h3>
+                <p className="mt-1 text-[15px] text-slate-500">
+                  Choose how you want to start setting up your project
+                </p>
               </div>
 
               <button
                 onClick={closeModal}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-5 px-6 py-6">
+            <div className="space-y-6 px-7 py-7">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Project name</label>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Project name</label>
                 <input
                   type="text"
                   placeholder="e.g. Offshore Windfarm Rotterdam"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                   autoFocus
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100"
                 />
-
-                {projectName.trim() && (
-                  <div className="mt-3 flex items-center gap-3">
-                    <div
-                      className="h-12 w-12 rounded-xl overflow-hidden border border-slate-200"
-                      style={{ background: TYPE_BG[detectType(projectName.trim())] }}
-                    >
-                      <Illustration type={detectType(projectName.trim())} />
-                    </div>
-                    <span className="text-sm text-slate-500">Project icon preview</span>
-                  </div>
-                )}
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  How do you want to add risks?
+                <label className="mb-3 block text-sm font-semibold text-slate-700">
+                  Choose how to start
                 </label>
 
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: "manual", label: "Manual", emoji: "✍️", desc: "Enter risks one by one" },
-                    { value: "csv", label: "CSV Import", emoji: "📄", desc: "Upload a spreadsheet" },
-                    { value: "api", label: "API", emoji: "🔌", desc: "Connect via API" },
-                  ].map((opt) => {
-                    const active = intakeMethod === opt.value;
+                <div className="grid gap-3 md:grid-cols-3">
+                  {startOptions.map((option) => {
+                    const active = startMethod === option.value;
+                    const Icon = option.icon;
 
                     return (
                       <button
-                        key={opt.value}
+                        key={option.value}
                         type="button"
-                        onClick={() => setIntakeMethod(opt.value as any)}
-                        className={`flex flex-col items-center rounded-xl border p-4 text-center transition ${
+                        onClick={() => setStartMethod(option.value)}
+                        className={`rounded-2xl border p-4 text-left transition ${
                           active
                             ? "border-violet-400 bg-violet-50 shadow-sm"
                             : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="text-2xl">{opt.emoji}</span>
-                        <span className={`mt-2 text-sm font-semibold ${active ? "text-violet-700" : "text-slate-700"}`}>
-                          {opt.label}
-                        </span>
-                        <span className="mt-0.5 text-[11px] text-slate-400 leading-tight">{opt.desc}</span>
+                        <div
+                          className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${
+                            active ? "bg-white text-violet-700" : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <div className="text-[15px] font-semibold text-slate-900">{option.title}</div>
+                        <p className="mt-2 text-[12px] leading-5 text-slate-500">{option.description}</p>
                       </button>
                     );
                   })}
@@ -1461,17 +1341,17 @@ function ProjectsPageContent() {
               </div>
 
               {message && (
-                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                   {message}
                 </p>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-7 py-5">
               <button
                 type="button"
                 onClick={closeModal}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -1480,9 +1360,9 @@ function ProjectsPageContent() {
                 type="button"
                 onClick={handleCreate}
                 disabled={creatingProject || !projectName.trim()}
-                className="h-10 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
+                className="h-11 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700 active:scale-[0.98] disabled:opacity-60"
               >
-                {creatingProject ? "Creating..." : "Create Project →"}
+                {creatingProject ? "Creating..." : "Continue →"}
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -10,14 +10,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-type Mode = "login" | "signup";
 type MessageType = "success" | "error" | "info";
 
 export default function AuthPage() {
   const router = useRouter();
 
-  const [mode, setMode] = useState<Mode>("login");
-  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -27,16 +24,6 @@ export default function AuthPage() {
 
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<MessageType | null>(null);
-
-  const isLogin = mode === "login";
-
-  const heading = useMemo(() => {
-    return isLogin ? "Welcome back" : "Create your account";
-  }, [isLogin]);
-
-  const subheading = useMemo(() => {
-    return isLogin ? "Log in to RiskBases" : "Sign up to RiskBases";
-  }, [isLogin]);
 
   function clearMessage() {
     setMessage("");
@@ -88,31 +75,14 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        await redirectAfterAuth();
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
-
-        if (error) throw error;
-
-        showSuccess("Account created successfully. Redirecting...");
-        await redirectAfterAuth();
-      }
+      await redirectAfterAuth();
     } catch (error: any) {
       showError(error?.message || "Something went wrong.");
     } finally {
@@ -147,45 +117,6 @@ export default function AuthPage() {
     }
   }
 
-  async function handleGoogleAuth() {
-    clearMessage();
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) showError(error.message);
-  }
-
-  async function handleMicrosoftAuth() {
-    clearMessage();
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "azure",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) showError(error.message);
-  }
-
-  async function handleAppleAuth() {
-    clearMessage();
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "apple",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) showError(error.message);
-  }
-
   const messageStyles =
     messageType === "error"
       ? "border-rose-200 bg-rose-50 text-rose-700"
@@ -203,7 +134,7 @@ export default function AuthPage() {
               alt="RiskBases"
               className="h-11 w-11 rounded-xl object-contain"
             />
-            <span className="whitespace-nowrap text-2xl font-bold tracking-[-0.03em] text-[#1a1a2e]">
+            <span className="whitespace-nowrap text-2xl font-bold tracking-[-0.03em] text-[#173269]">
               RiskBases
             </span>
           </div>
@@ -214,86 +145,27 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => router.push("/")}
-                  className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+                  className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-[#173269]"
                 >
                   <ArrowLeft size={16} />
                   Back to home
                 </button>
 
-                <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-[36px] xl:text-[40px]">
-                  {heading}
+                <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.03em] text-[#173269] sm:text-[36px] xl:text-[40px]">
+                  Welcome back
                 </h1>
 
                 <p className="mt-2 text-[15px] text-slate-600 sm:text-[16px]">
-                  {subheading}
+                  Log in to RiskBases
                 </p>
 
-                <div className="mt-6 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
-                    aria-label="Continue with Google"
-                  >
-                    <img
-                      src="/google.png"
-                      alt="Google"
-                      className="h-5 w-5 object-contain"
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleMicrosoftAuth}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
-                    aria-label="Continue with Microsoft"
-                  >
-                    <img
-                      src="/microsoft.png"
-                      alt="Microsoft"
-                      className="h-5 w-5 object-contain"
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleAppleAuth}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white transition hover:border-slate-300 hover:shadow-sm"
-                    aria-label="Continue with Apple"
-                  >
-                    <img
-                      src="/apple.png"
-                      alt="Apple"
-                      className="h-5 w-5 object-contain"
-                    />
-                  </button>
-                </div>
-
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-slate-200" />
-                  <span className="whitespace-nowrap text-xs text-slate-400 sm:text-sm">
-                    {isLogin ? "or log in via email" : "or sign up via email"}
-                  </span>
-                  <div className="h-px flex-1 bg-slate-200" />
-                </div>
-
-                <form onSubmit={handleSubmit} className="mt-6 space-y-3.5">
-                  {!isLogin && (
-                    <input
-                      type="text"
-                      placeholder="Your name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 px-5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
-                    />
-                  )}
-
+                <form onSubmit={handleSubmit} className="mt-8 space-y-3.5">
                   <input
                     type="email"
                     placeholder="Email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 px-5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                    className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 px-5 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#173269] focus:bg-white"
                   />
 
                   <div className="relative">
@@ -302,37 +174,35 @@ export default function AuthPage() {
                       placeholder="Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 px-5 pr-12 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white"
+                      className="h-12 w-full rounded-full border border-slate-200 bg-slate-50 px-5 pr-12 text-[15px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#173269] focus:bg-white"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-[#173269]"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
 
-                  {isLogin && (
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={handleForgotPassword}
-                        disabled={resetLoading}
-                        className="text-sm font-medium text-violet-600 transition hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {resetLoading ? "Sending..." : "Forgot password?"}
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={resetLoading}
+                      className="text-sm font-medium text-[#173269] transition hover:text-[#10254f] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resetLoading ? "Sending..." : "Forgot password?"}
+                    </button>
+                  </div>
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="h-12 w-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 text-[16px] font-semibold text-white shadow-[0_10px_30px_rgba(168,85,247,0.28)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-12 w-full rounded-full bg-[#173269] text-[16px] font-semibold text-white shadow-[0_10px_30px_rgba(23,50,105,0.22)] transition hover:bg-[#10254f] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {loading ? "Please wait..." : isLogin ? "Log in" : "Sign up"}
+                    {loading ? "Please wait..." : "Log in"}
                   </button>
 
                   {message ? (
@@ -345,17 +215,10 @@ export default function AuthPage() {
                 </form>
 
                 <div className="mt-6 text-sm text-slate-600">
-                  {isLogin ? "No account? " : "Already have an account? "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode(isLogin ? "signup" : "login");
-                      clearMessage();
-                    }}
-                    className="font-semibold text-violet-600 transition hover:text-violet-700"
-                  >
-                    {isLogin ? "Sign up" : "Log in"}
-                  </button>
+                  Need access?{" "}
+                  <span className="font-semibold text-[#173269]">
+                    Contact your organization administrator.
+                  </span>
                 </div>
               </div>
             </div>

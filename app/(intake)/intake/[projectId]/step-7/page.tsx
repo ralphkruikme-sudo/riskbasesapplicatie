@@ -8,11 +8,12 @@ import {
   Loader2,
   Check,
   AlertTriangle,
-  X,
   ChevronDown,
   ChevronUp,
   ShieldAlert,
   Brain,
+  WandSparkles,
+  RefreshCw,
 } from "lucide-react";
 
 const supabase = createClient(
@@ -22,7 +23,7 @@ const supabase = createClient(
 
 type Project = {
   id: string;
-  name: string;
+  name: string | null;
   description: string | null;
   project_type: string | null;
   contract_type: string | null;
@@ -62,12 +63,8 @@ type GeneratedRisk = {
 };
 
 function levelClasses(level: GeneratedRisk["level"]) {
-  if (level === "high") {
-    return "border-red-200 bg-red-50 text-red-700";
-  }
-  if (level === "medium") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  }
+  if (level === "high") return "border-red-200 bg-red-50 text-red-700";
+  if (level === "medium") return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
@@ -78,10 +75,34 @@ function sourceClasses(source: GeneratedRisk["source_type"]) {
   return "border-violet-200 bg-violet-100 text-violet-700";
 }
 
+function formatLocation(project: Project | null) {
+  if (!project) return "—";
+  const value = [project.city, project.region, project.country]
+    .filter(Boolean)
+    .join(", ");
+  return value || "—";
+}
+
+function formatProjectValue(value: string | null) {
+  if (!value?.trim()) return "—";
+  return value;
+}
+
+function dedupeByTitle(risks: GeneratedRisk[]) {
+  const seen = new Set<string>();
+
+  return risks.filter((risk) => {
+    const key = risk.title.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function Step7Page() {
-  const params = useParams();
   const router = useRouter();
-  const projectId = params.projectId as string;
+  const params = useParams<{ projectId: string }>();
+  const projectId = params.projectId;
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,46 +113,54 @@ export default function Step7Page() {
   const [generatedRisks, setGeneratedRisks] = useState<GeneratedRisk[]>([]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
+  const progress = 88;
+
   useEffect(() => {
     async function loadProject() {
-      const { data, error } = await supabase
-        .from("projects")
-        .select(`
-          id,
-          name,
-          description,
-          project_type,
-          contract_type,
-          project_value,
-          start_date,
-          end_date,
-          client_name,
-          country,
-          region,
-          city,
-          site_type,
-          permit_required,
-          project_phase,
-          key_milestones,
-          critical_dependencies,
-          initial_risks,
-          selected_risk_categories,
-          client_stakeholder,
-          authority_stakeholder,
-          main_contractor,
-          subcontractors
-        `)
-        .eq("id", projectId)
-        .single();
+      try {
+        setLoading(true);
+        setMessage("");
 
-      if (error) {
-        setMessage(error.message || "Could not load step 7.");
+        const { data, error } = await supabase
+          .from("projects")
+          .select(`
+            id,
+            name,
+            description,
+            project_type,
+            contract_type,
+            project_value,
+            start_date,
+            end_date,
+            client_name,
+            country,
+            region,
+            city,
+            site_type,
+            permit_required,
+            project_phase,
+            key_milestones,
+            critical_dependencies,
+            initial_risks,
+            selected_risk_categories,
+            client_stakeholder,
+            authority_stakeholder,
+            main_contractor,
+            subcontractors
+          `)
+          .eq("id", projectId)
+          .single();
+
+        if (error) throw error;
+        if (!data) throw new Error("Project not found.");
+
+        setProject(data);
+      } catch (error: any) {
+        setProject(null);
+        setMessage(error?.message || "Could not load Step 7.");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setProject(data);
-      setLoading(false);
     }
 
     if (projectId) {
@@ -142,17 +171,17 @@ export default function Step7Page() {
   async function saveStep() {
     setSavingStep(true);
 
-    const { error } = await supabase
-      .from("projects")
-      .update({
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", projectId);
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", projectId);
 
-    setSavingStep(false);
-
-    if (error) {
-      throw new Error(error.message || "Could not save step.");
+      if (error) throw error;
+    } finally {
+      setSavingStep(false);
     }
   }
 
@@ -166,7 +195,7 @@ export default function Step7Page() {
     try {
       await saveStep();
 
-      const response = await fetch(`/api/projects/${projectId}/generate-risks`, {
+      const response = await fetch(`/api/generate-risk/${projectId}`, {
         method: "POST",
       });
 
@@ -176,16 +205,33 @@ export default function Step7Page() {
         throw new Error(data?.error || "Risk generation failed.");
       }
 
-      const combined: GeneratedRisk[] = (data.combined || []).map((risk: any) => ({
-        ...risk,
-        selected: true,
-      }));
+      const combined: GeneratedRisk[] = dedupeByTitle(
+        (data.combined || []).map((risk: any) => ({
+          title: risk.title ?? "",
+          description: risk.description ?? "",
+          category: risk.category ?? "Technical",
+          probability: Number(risk.probability ?? 3),
+          impact: Number(risk.impact ?? 3),
+          score: Number(
+            risk.score ??
+              Number(risk.probability ?? 3) * Number(risk.impact ?? 3)
+          ),
+          level: (risk.level ?? "medium") as "low" | "medium" | "high",
+          suggested_action: risk.suggested_action ?? "",
+          source_type: (risk.source_type ?? "ai") as "template" | "ai",
+          source_template_id: risk.source_template_id ?? null,
+          generation_reason: risk.generation_reason ?? null,
+          selected: true,
+        }))
+      );
 
       setGeneratedRisks(combined);
       setExpandedIndex(combined.length > 0 ? 0 : null);
 
       if (combined.length === 0) {
-        setMessage("No risks were generated yet.");
+        setMessage("No baseline risks were generated. Check your templates and AI route.");
+      } else {
+        setMessage("Initial baseline generated. Review the proposed risks before continuing.");
       }
     } catch (error: any) {
       setMessage(error?.message || "Could not generate risks.");
@@ -224,9 +270,7 @@ export default function Step7Page() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: true });
 
-      if (existingError) {
-        throw new Error(existingError.message);
-      }
+      if (existingError) throw existingError;
 
       const nextIndex = (existingRisks?.length || 0) + 1;
 
@@ -238,8 +282,6 @@ export default function Step7Page() {
         category: risk.category,
         probability: risk.probability,
         impact: risk.impact,
-        score: risk.score,
-        level: risk.level,
         status: "open",
         source_type: risk.source_type,
         source_template_id: risk.source_template_id ?? null,
@@ -252,9 +294,7 @@ export default function Step7Page() {
         .from("project_risks")
         .insert(rows);
 
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
+      if (insertError) throw insertError;
 
       const highRiskActions = selected
         .filter((risk) => risk.level === "high" && risk.suggested_action?.trim())
@@ -271,12 +311,19 @@ export default function Step7Page() {
           .from("risk_actions")
           .insert(highRiskActions);
 
-        if (actionError) {
-          throw new Error(actionError.message);
-        }
+        if (actionError) throw actionError;
       }
 
-      router.push(`/app/projects/${projectId}/intake/step-8`);
+      const { error: projectUpdateError } = await supabase
+        .from("projects")
+        .update({
+          initial_risk_generation_at: new Date().toISOString(),
+        })
+        .eq("id", projectId);
+
+      if (projectUpdateError) throw projectUpdateError;
+
+      router.push(`/intake/${projectId}/step-8`);
     } catch (error: any) {
       setMessage(error?.message || "Could not save generated risks.");
     } finally {
@@ -306,10 +353,34 @@ export default function Step7Page() {
 
   if (loading) {
     return (
-      <section className="flex-1 bg-slate-50 py-16">
-        <div className="mx-auto max-w-5xl px-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
-            Loading step 7...
+      <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <p className="text-sm text-slate-600">Loading Step 7...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!project) {
+    return (
+      <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+              Project not found
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              {message || "We could not load this project for the intake flow."}
+            </p>
+
+            <button
+              onClick={() => router.push("/app")}
+              className="mt-6 inline-flex h-11 items-center rounded-2xl border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Back to projects
+            </button>
           </div>
         </div>
       </section>
@@ -317,89 +388,127 @@ export default function Step7Page() {
   }
 
   return (
-    <section className="flex-1 bg-slate-50 py-16">
-      <div className="mx-auto w-full max-w-5xl px-6">
-        <div className="mb-10">
+    <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mb-8">
           <p className="text-sm font-semibold text-violet-600">Step 7 of 8</p>
 
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
-            Generate Initial Risks
+          <h1 className="mt-3 text-5xl font-semibold tracking-[-0.04em] text-slate-950">
+            Generate initial baseline
           </h1>
 
-          <p className="mt-2 max-w-3xl text-slate-500">
-            We combine baseline risk templates with AI-based project-specific
-            suggestions for{" "}
-            <span className="font-medium text-slate-700">{project?.name}</span>.
-            Review the proposed risks, deselect anything irrelevant, and continue.
+          <p className="mt-3 max-w-3xl text-[15px] leading-7 text-slate-600">
+            RiskBases combines structured baseline templates with AI-generated
+            project-specific suggestions to create the first version of your risk register.
           </p>
 
-          <div className="mt-6 flex items-center gap-6">
-            <div className="h-3 flex-1 rounded-full bg-slate-200">
-              <div className="h-3 w-[87.5%] rounded-full bg-violet-500" />
+          <div className="mt-8 flex items-center gap-5">
+            <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
-              87.5%
+            <div className="flex h-12 min-w-[88px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800">
+              {progress}%
             </div>
           </div>
         </div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm">
+          <div className="mb-6 rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
             {message}
           </div>
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_0.65fr]">
           <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <div className="rounded-[32px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)] md:p-10">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-                    <Sparkles className="h-4 w-4" />
-                    Risk Intelligence
+                    <WandSparkles className="h-4 w-4" />
+                    Baseline engine
                   </div>
 
-                  <h2 className="mt-4 text-2xl font-semibold text-slate-900">
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
                     Generate your first risk register
                   </h2>
 
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                    This step generates baseline risks from your project profile
-                    and adds extra AI suggestions for project-specific context.
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                    This step uses your intake data to combine library-based baseline
+                    risks with additional AI suggestions that match your project context,
+                    dependencies and delivery profile.
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleGenerateRisks}
-                  disabled={generating || savingStep}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {generating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate risks
-                    </>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateRisks}
+                    disabled={generating || savingStep}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {generating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate baseline
+                      </>
+                    )}
+                  </button>
+
+                  {generatedRisks.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleGenerateRisks}
+                      disabled={generating || savingStep}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Regenerate
+                    </button>
                   )}
-                </button>
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Includes
+                  </p>
+                  <p className="mt-2 text-sm text-slate-800">
+                    Baseline template risks matched to project type, site conditions,
+                    phase and dependencies
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Includes
+                  </p>
+                  <p className="mt-2 text-sm text-slate-800">
+                    AI suggestions tailored to milestones, stakeholders,
+                    constraints and delivery complexity
+                  </p>
+                </div>
               </div>
             </div>
 
             {generatedRisks.length > 0 && (
-              <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-                <div className="mb-6 flex items-center justify-between">
+              <div className="rounded-[32px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)] md:p-10">
+                <div className="mb-6 flex items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      Proposed risks
+                    <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                      Generated risk suggestions
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Select the risks you want to add to the project register.
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Review the generated baseline and deselect anything irrelevant before continuing.
                     </p>
                   </div>
 
@@ -443,9 +552,7 @@ export default function Step7Page() {
                                       risk.source_type
                                     )}`}
                                   >
-                                    {risk.source_type === "template"
-                                      ? "Baseline"
-                                      : "AI suggestion"}
+                                    {risk.source_type === "template" ? "Baseline" : "AI suggestion"}
                                   </span>
 
                                   <span
@@ -458,8 +565,7 @@ export default function Step7Page() {
                                 </div>
 
                                 <p className="mt-2 text-sm text-slate-500">
-                                  {risk.category} • Probability {risk.probability} •
-                                  Impact {risk.impact} • Score {risk.score}
+                                  {risk.category} • Probability {risk.probability} • Impact {risk.impact} • Score {risk.score}
                                 </p>
                               </div>
                             </div>
@@ -485,7 +591,7 @@ export default function Step7Page() {
                             <div className="rounded-2xl bg-slate-50 p-4">
                               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <div>
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
                                     Description
                                   </p>
                                   <p className="mt-1 text-sm leading-6 text-slate-700">
@@ -494,7 +600,7 @@ export default function Step7Page() {
                                 </div>
 
                                 <div>
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
                                     Suggested action
                                   </p>
                                   <p className="mt-1 text-sm leading-6 text-slate-700">
@@ -505,7 +611,7 @@ export default function Step7Page() {
 
                               {risk.generation_reason && (
                                 <div className="mt-4">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
                                     Why this was included
                                   </p>
                                   <p className="mt-1 text-sm leading-6 text-slate-700">
@@ -521,10 +627,10 @@ export default function Step7Page() {
                   })}
                 </div>
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => router.push(`/app/projects/${projectId}/intake/step-6`)}
+                    onClick={() => router.push(`/intake/${projectId}/step-6`)}
                     className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     Back
@@ -554,10 +660,8 @@ export default function Step7Page() {
           </div>
 
           <div className="space-y-6">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-slate-900">
-                Project context
-              </h3>
+            <div className="rounded-[32px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+              <h3 className="text-lg font-semibold text-slate-950">Project context</h3>
 
               <div className="mt-5 space-y-4 text-sm">
                 <div>
@@ -567,51 +671,45 @@ export default function Step7Page() {
 
                 <div>
                   <p className="text-slate-400">Type</p>
-                  <p className="mt-1 font-medium text-slate-800">
-                    {project?.project_type || "—"}
-                  </p>
+                  <p className="mt-1 font-medium text-slate-800">{project?.project_type || "—"}</p>
                 </div>
 
                 <div>
                   <p className="text-slate-400">Contract</p>
-                  <p className="mt-1 font-medium text-slate-800">
-                    {project?.contract_type || "—"}
-                  </p>
+                  <p className="mt-1 font-medium text-slate-800">{project?.contract_type || "—"}</p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Project value</p>
+                  <p className="mt-1 font-medium text-slate-800">{formatProjectValue(project?.project_value || null)}</p>
                 </div>
 
                 <div>
                   <p className="text-slate-400">Location</p>
-                  <p className="mt-1 font-medium text-slate-800">
-                    {[project?.city, project?.region, project?.country]
-                      .filter(Boolean)
-                      .join(", ") || "—"}
-                  </p>
+                  <p className="mt-1 font-medium text-slate-800">{formatLocation(project)}</p>
                 </div>
 
                 <div>
                   <p className="text-slate-400">Site type</p>
-                  <p className="mt-1 font-medium text-slate-800">
-                    {project?.site_type || "—"}
-                  </p>
+                  <p className="mt-1 font-medium text-slate-800">{project?.site_type || "—"}</p>
                 </div>
 
                 <div>
                   <p className="text-slate-400">Permit required</p>
                   <p className="mt-1 font-medium text-slate-800">
-                    {project?.permit_required === null
-                      ? "Unknown"
-                      : project?.permit_required
-                      ? "Yes"
-                      : "No"}
+                    {project?.permit_required === null ? "Unknown" : project?.permit_required ? "Yes" : "No"}
                   </p>
+                </div>
+
+                <div>
+                  <p className="text-slate-400">Project phase</p>
+                  <p className="mt-1 font-medium text-slate-800">{project?.project_phase || "—"}</p>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-slate-900">
-                Generation summary
-              </h3>
+            <div className="rounded-[32px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+              <h3 className="text-lg font-semibold text-slate-950">Generation summary</h3>
 
               <div className="mt-5 space-y-3">
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -619,9 +717,7 @@ export default function Step7Page() {
                     <ShieldAlert className="h-4 w-4" />
                     Baseline risks
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {baselineCount}
-                  </span>
+                  <span className="text-sm font-semibold text-slate-900">{baselineCount}</span>
                 </div>
 
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -629,9 +725,7 @@ export default function Step7Page() {
                     <Brain className="h-4 w-4" />
                     AI suggestions
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {aiCount}
-                  </span>
+                  <span className="text-sm font-semibold text-slate-900">{aiCount}</span>
                 </div>
 
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -639,9 +733,7 @@ export default function Step7Page() {
                     <AlertTriangle className="h-4 w-4" />
                     High risks
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {highCount}
-                  </span>
+                  <span className="text-sm font-semibold text-slate-900">{highCount}</span>
                 </div>
 
                 <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -649,24 +741,20 @@ export default function Step7Page() {
                     <Check className="h-4 w-4" />
                     Selected
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {selectedCount}
-                  </span>
+                  <span className="text-sm font-semibold text-slate-900">{selectedCount}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-slate-900">
-                How this works
-              </h3>
+            <div className="rounded-[32px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+              <h3 className="text-lg font-semibold text-slate-950">How this works</h3>
 
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>• Baseline risks come from your template library.</li>
-                <li>• AI adds only extra project-specific suggestions.</li>
-                <li>• High risks can automatically create mitigation actions.</li>
-                <li>• You stay in control by selecting what gets saved.</li>
-              </ul>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <p>• Baseline risks come from your risk template library.</p>
+                <p>• AI adds extra project-specific suggestions based on project context.</p>
+                <p>• High risks can automatically create mitigation actions.</p>
+                <p>• You stay in control by selecting what gets saved to the project.</p>
+              </div>
             </div>
           </div>
         </div>
