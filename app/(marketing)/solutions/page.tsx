@@ -1,267 +1,199 @@
 "use client";
 
-import { useRef } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { motion, useInView } from "framer-motion";
-import { ArrowRight, Check } from "lucide-react";
-
-type SolutionItem = {
-  slug: string;
-  title: string;
-  description: string;
-  body: string;
-  image: string;
-  imageAlt: string;
-  imageSide: "left" | "right";
-  bullets: string[];
-};
-
-const solutions: SolutionItem[] = [
-  {
-    slug: "construction",
-    title: "Construction",
-    description: "Mitigate construction project risks with more clarity and control.",
-    body:
-      "Centralize project risk oversight across site operations, contractors and delivery milestones. Keep teams aligned on safety, compliance and execution without relying on fragmented spreadsheets.",
-    image: "/construction.jpg",
-    imageAlt: "Construction industry solution",
-    imageSide: "left",
-    bullets: [
-      "Monitor site safety protocols and project compliance",
-      "Assess contractor and subcontractor risk profiles",
-      "Track delays, issues and on-site hazards in one workflow",
-    ],
-  },
-  {
-    slug: "infrastructure",
-    title: "Infrastructure",
-    description: "Streamline infrastructure risk management across complex public works.",
-    body:
-      "Navigate large-scale infrastructure delivery with structured oversight, early warning indicators and standardized reporting. Reduce surprises and improve accountability across teams and suppliers.",
-    image: "/infrastructure.jpg",
-    imageAlt: "Infrastructure industry solution",
-    imageSide: "right",
-    bullets: [
-      "Monitor infrastructure risk dashboards centrally",
-      "Set early warnings for critical milestones and exposures",
-      "Assess contractor, supplier and dependency risks",
-    ],
-  },
-  {
-    slug: "maritime",
-    title: "Maritime & Offshore",
-    description: "Manage risks across maritime, offshore and port operations.",
-    body:
-      "Maintain stronger oversight of operational, regulatory and supply chain risks across vessels, terminals and offshore environments. Give teams one structured system for identification, ownership and review.",
-    image: "/maritime.png",
-    imageAlt: "Maritime and offshore solution",
-    imageSide: "left",
-    bullets: [
-      "Monitor vessels and offshore operations in real time",
-      "Improve compliance with maritime regulations",
-      "Strengthen resilience across offshore supply chains",
-    ],
-  },
-  {
-    slug: "event-management",
-    title: "Event Management",
-    description: "Keep event execution controlled across planning, vendors and operations.",
-    body:
-      "Coordinate venues, suppliers, health and safety considerations and operational dependencies in one place. Reduce execution risk and improve clarity from preparation to live event delivery.",
-    image: "/event.jpg",
-    imageAlt: "Event management solution",
-    imageSide: "right",
-    bullets: [
-      "Track vendor, venue and operational risks clearly",
-      "Improve incident readiness and live event coordination",
-      "Keep planning, ownership and mitigation in one workflow",
-    ],
-  },
-];
-
-function Reveal({
-  children,
-  direction = "up",
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  direction?: "left" | "right" | "up";
-  delay?: number;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
-
-  const hiddenX = direction === "left" ? -48 : direction === "right" ? 48 : 0;
-  const hiddenY = direction === "up" ? 32 : 0;
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, x: hiddenX, y: hiddenY }}
-      animate={
-        isInView
-          ? { opacity: 1, x: 0, y: 0 }
-          : { opacity: 0, x: hiddenX, y: hiddenY }
-      }
-      transition={{
-        duration: 0.7,
-        ease: "easeOut",
-        delay,
-      }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function SolutionCard({ item, index }: { item: SolutionItem; index: number }) {
-  const imageBlock = (
-    <div className="relative min-h-[320px] overflow-hidden bg-[#e9edf1] md:min-h-[420px]">
-      <Image
-        src={item.image}
-        alt={item.imageAlt}
-        fill
-        className="object-cover object-center"
-        priority={index === 0}
-      />
-    </div>
-  );
-
-  const textBlock = (
-    <div className="flex h-full flex-col justify-center p-8 md:p-10 lg:p-12">
-      <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-black/55">
-        Solution
-      </p>
-
-      <h2 className="mt-3 text-[34px] font-semibold leading-[1.02] tracking-[-0.04em] text-black md:text-[44px]">
-        {item.title}
-      </h2>
-
-      <p className="mt-5 text-[20px] leading-8 text-black">
-        {item.description}
-      </p>
-
-      <p className="mt-5 max-w-[620px] text-[17px] leading-8 text-black">
-        {item.body}
-      </p>
-
-      <div className="mt-7 space-y-4">
-        {item.bullets.map((bullet) => (
-          <div key={bullet} className="flex items-start gap-3">
-            <div className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#eef7ee]">
-              <Check className="h-3.5 w-3.5 text-[#4b9b4b]" />
-            </div>
-            <p className="text-[16px] leading-7 text-black">{bullet}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8">
-        <Link
-          href={`/solutions#${item.slug}`}
-          className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90"
-        >
-          Explore {item.title}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    </div>
-  );
-
-  return (
-    <Reveal
-      direction={item.imageSide === "left" ? "left" : "right"}
-      delay={index * 0.05}
-    >
-      <section
-        id={item.slug}
-        className="overflow-hidden rounded-[28px] border border-black/10 bg-white"
-      >
-        <div
-          className={`grid min-h-[420px] lg:grid-cols-2 ${
-            item.imageSide === "right" ? "lg:[&>*:first-child]:order-1 lg:[&>*:last-child]:order-2" : ""
-          }`}
-        >
-          {item.imageSide === "left" ? (
-            <>
-              {imageBlock}
-              {textBlock}
-            </>
-          ) : (
-            <>
-              {textBlock}
-              {imageBlock}
-            </>
-          )}
-        </div>
-      </section>
-    </Reveal>
-  );
-}
+import { useEffect, useRef } from "react";
 
 export default function SolutionsPage() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let width = 0;
+    let height = 0;
+
+    const particles: {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      r: number;
+      alpha: number;
+      pulse: number;
+    }[] = [];
+
+    const resize = () => {
+      width = canvas.width = canvas.offsetWidth;
+      height = canvas.height = canvas.offsetHeight;
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    for (let i = 0; i < 60; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: Math.random() * 2 + 0.5,
+        alpha: Math.random() * 0.4 + 0.05,
+        pulse: Math.random() * Math.PI * 2,
+      });
+    }
+
+    let t = 0;
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height);
+      t += 0.012;
+
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.pulse += 0.02;
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        const a = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${a})`;
+        ctx.fill();
+      }
+
+      // draw subtle connecting lines
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(0,0,0,${0.04 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
   return (
-    <main className="min-h-screen bg-[#f3f4f6] text-black">
-      <section className="mx-auto max-w-[1280px] px-6 pb-24 pt-16 md:px-8 md:pt-20">
-        <div className="mx-auto max-w-[1080px]">
-          <Reveal>
-            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-black">
-              Solutions
-            </p>
-          </Reveal>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white">
+      {/* Particle canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full"
+        style={{ display: "block" }}
+      />
 
-          <Reveal delay={0.04}>
-            <h1 className="max-w-[760px] text-4xl font-semibold leading-[0.98] tracking-[-0.055em] text-black md:text-[68px]">
-              Risk management adapted
-              <span className="text-black/35"> to your industry.</span>
-            </h1>
-          </Reveal>
+      {/* Subtle radial glow in center */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(240,240,255,0.7) 0%, transparent 70%)",
+        }}
+      />
 
-          <Reveal delay={0.08}>
-            <p className="mt-6 max-w-[840px] text-[20px] leading-9 text-black">
-              RiskBases adapts to your environment. From construction and
-              infrastructure to maritime and event operations, manage risk with
-              more clarity, ownership and control.
-            </p>
-          </Reveal>
-
-          <Reveal delay={0.12}>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#construction"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
-              >
-                Construction
-              </a>
-              <a
-                href="#infrastructure"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
-              >
-                Infrastructure
-              </a>
-              <a
-                href="#maritime"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
-              >
-                Maritime & Offshore
-              </a>
-              <a
-                href="#event-management"
-                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-black hover:text-white"
-              >
-                Event Management
-              </a>
-            </div>
-          </Reveal>
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center text-center">
+        {/* Animated ring */}
+        <div className="relative mb-10 flex items-center justify-center">
+          <span
+            className="absolute inline-block rounded-full border border-black/10"
+            style={{
+              width: 120,
+              height: 120,
+              animation: "ping-slow 2.8s cubic-bezier(0,0,0.2,1) infinite",
+            }}
+          />
+          <span
+            className="absolute inline-block rounded-full border border-black/6"
+            style={{
+              width: 160,
+              height: 160,
+              animation: "ping-slow 2.8s cubic-bezier(0,0,0.2,1) infinite 0.4s",
+            }}
+          />
+          <span
+            className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-black"
+            style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+          >
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <circle cx="14" cy="14" r="5" fill="white" />
+              <path
+                d="M14 3v3M14 22v3M3 14h3M22 14h3M6.22 6.22l2.12 2.12M19.66 19.66l2.12 2.12M6.22 21.78l2.12-2.12M19.66 8.34l2.12-2.12"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
         </div>
 
-        <div className="mx-auto mt-14 flex max-w-[1080px] flex-col gap-7">
-          {solutions.map((item, index) => (
-            <SolutionCard key={item.slug} item={item} index={index} />
-          ))}
-        </div>
-      </section>
+        <p
+          className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-black/40"
+          style={{ letterSpacing: "0.25em" }}
+        >
+          Solutions
+        </p>
+
+        <h1
+          className="text-[clamp(52px,10vw,96px)] font-semibold leading-none tracking-[-0.05em] text-black"
+          style={{
+            animation: "fade-up 0.9s ease both",
+          }}
+        >
+          Coming
+          <br />
+          <span
+            style={{
+              WebkitTextStroke: "2px black",
+              color: "transparent",
+              animation: "fade-up 0.9s ease 0.12s both",
+              display: "inline-block",
+            }}
+          >
+            Soon.
+          </span>
+        </h1>
+
+        <p
+          className="mt-6 max-w-[380px] text-[17px] leading-8 text-black/50"
+          style={{ animation: "fade-up 0.9s ease 0.22s both" }}
+        >
+          We're crafting something great. Check back soon to explore our industry solutions.
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes ping-slow {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          80%  { transform: scale(1.7); opacity: 0; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </main>
   );
 }

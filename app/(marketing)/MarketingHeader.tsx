@@ -38,8 +38,6 @@ const navItems: NavItemType[] = [
     dropdown: [
       { label: "Construction", href: "/solutions#construction" },
       { label: "Infrastructure", href: "/solutions#infrastructure" },
-      { label: "Maritime & Offshore", href: "/solutions#maritime" },
-      { label: "Event Management", href: "/solutions#event-management" },
     ],
   },
   {

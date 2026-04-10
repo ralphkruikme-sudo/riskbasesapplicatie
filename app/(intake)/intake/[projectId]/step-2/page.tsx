@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useParams, useRouter } from "next/navigation";
 import {
-  CalendarRange,
-  Loader2,
   ArrowLeft,
   ArrowRight,
+  CalendarRange,
+  Loader2,
   Save,
   Wallet,
 } from "lucide-react";
@@ -20,7 +20,7 @@ const supabase = createClient(
 type Project = {
   id: string;
   name: string | null;
-  project_value: string | null;
+  project_value: number | null;
   start_date: string | null;
   end_date: string | null;
   budget_confidence: string | null;
@@ -30,6 +30,10 @@ type Project = {
   phasing_complexity: string | null;
   access_window_constraints: string | null;
   working_hour_restrictions: string | null;
+  fixed_completion_deadline: boolean | null;
+  client_deadline_sensitivity: string | null;
+  ld_penalty_exposure: string | null;
+  execution_continuity_required: boolean | null;
 };
 
 function onlyDigits(value: string) {
@@ -38,7 +42,7 @@ function onlyDigits(value: string) {
 
 function formatEuroFromDigits(value: string) {
   if (!value) return "";
-  return new Intl.NumberFormat("en-GB").format(Number(value));
+  return new Intl.NumberFormat("nl-NL").format(Number(value));
 }
 
 function normalizeDateValue(value: string | null) {
@@ -61,7 +65,9 @@ function calculateDurationDays(startDate: string, endDate: string) {
 }
 
 function calculateDurationLabel(startDate: string, endDate: string) {
-  if (!startDate || !endDate) return "Add a planned start and end date to estimate delivery duration.";
+  if (!startDate || !endDate) {
+    return "Add a planned start and end date to estimate delivery duration.";
+  }
 
   const diffDays = calculateDurationDays(startDate, endDate);
 
@@ -85,6 +91,10 @@ function buildPlanningSignal(params: {
   phasingComplexity: string;
   accessWindowConstraints: string;
   workingHourRestrictions: string;
+  fixedCompletionDeadline: boolean;
+  clientDeadlineSensitivity: string;
+  ldPenaltyExposure: string;
+  executionContinuityRequired: boolean;
 }) {
   const {
     startDate,
@@ -95,12 +105,24 @@ function buildPlanningSignal(params: {
     phasingComplexity,
     accessWindowConstraints,
     workingHourRestrictions,
+    fixedCompletionDeadline,
+    clientDeadlineSensitivity,
+    ldPenaltyExposure,
+    executionContinuityRequired,
   } = params;
 
   const diffDays = calculateDurationDays(startDate, endDate);
 
   if (diffDays === -1) {
-    return "The end date is before the start date. Fix the schedule window first.";
+    return "The end date is before the start date. Fix the planning window first.";
+  }
+
+  if (
+    fixedCompletionDeadline ||
+    clientDeadlineSensitivity === "high" ||
+    ldPenaltyExposure === "high"
+  ) {
+    return "This project shows clear deadline sensitivity, which increases delivery pressure and delay exposure.";
   }
 
   if (
@@ -108,23 +130,24 @@ function buildPlanningSignal(params: {
     deadlineCriticality === "high" ||
     procurementLeadRisk === "high"
   ) {
-    return "This commercial and planning profile indicates elevated baseline exposure for schedule, coordination and procurement risks.";
+    return "This profile indicates elevated exposure for schedule, procurement and coordination risks.";
   }
 
   if (
     phasingComplexity === "high" ||
     accessWindowConstraints === "high" ||
-    workingHourRestrictions === "high"
+    workingHourRestrictions === "high" ||
+    executionContinuityRequired
   ) {
-    return "This delivery setup suggests additional sequencing and operational planning risk.";
+    return "This setup suggests additional sequencing, access and operational continuity pressure.";
   }
 
   if (typeof diffDays === "number" && diffDays > 365) {
-    return "A longer delivery horizon may increase scope drift, coordination and interface risk.";
+    return "A longer delivery horizon may increase coordination, scope drift and interface risk.";
   }
 
   if (typeof diffDays === "number" && diffDays > 0 && diffDays < 90) {
-    return "A compressed delivery window can increase schedule, approval and procurement pressure.";
+    return "A compressed delivery window can increase schedule and procurement pressure.";
   }
 
   return "This planning profile currently suggests a moderate baseline with standard delivery exposure.";
@@ -150,6 +173,11 @@ export default function Step2Page() {
   const [phasingComplexity, setPhasingComplexity] = useState("medium");
   const [accessWindowConstraints, setAccessWindowConstraints] = useState("low");
   const [workingHourRestrictions, setWorkingHourRestrictions] = useState("low");
+  const [fixedCompletionDeadline, setFixedCompletionDeadline] = useState(false);
+  const [clientDeadlineSensitivity, setClientDeadlineSensitivity] = useState("medium");
+  const [ldPenaltyExposure, setLdPenaltyExposure] = useState("low");
+  const [executionContinuityRequired, setExecutionContinuityRequired] =
+    useState(false);
 
   const progress = 25;
 
@@ -171,6 +199,10 @@ export default function Step2Page() {
       phasingComplexity,
       accessWindowConstraints,
       workingHourRestrictions,
+      fixedCompletionDeadline,
+      clientDeadlineSensitivity,
+      ldPenaltyExposure,
+      executionContinuityRequired,
     });
   }, [
     startDate,
@@ -181,6 +213,10 @@ export default function Step2Page() {
     phasingComplexity,
     accessWindowConstraints,
     workingHourRestrictions,
+    fixedCompletionDeadline,
+    clientDeadlineSensitivity,
+    ldPenaltyExposure,
+    executionContinuityRequired,
   ]);
 
   useEffect(() => {
@@ -207,7 +243,11 @@ export default function Step2Page() {
             procurement_lead_risk,
             phasing_complexity,
             access_window_constraints,
-            working_hour_restrictions
+            working_hour_restrictions,
+            fixed_completion_deadline,
+            client_deadline_sensitivity,
+            ld_penalty_exposure,
+            execution_continuity_required
           `)
           .eq("id", projectId)
           .single();
@@ -218,7 +258,11 @@ export default function Step2Page() {
         const loaded = data as Project;
 
         setProject(loaded);
-        setProjectValueRaw(loaded.project_value || "");
+        setProjectValueRaw(
+          loaded.project_value !== null && loaded.project_value !== undefined
+            ? String(loaded.project_value)
+            : ""
+        );
         setStartDate(normalizeDateValue(loaded.start_date));
         setEndDate(normalizeDateValue(loaded.end_date));
         setBudgetConfidence(loaded.budget_confidence || "medium");
@@ -228,6 +272,14 @@ export default function Step2Page() {
         setPhasingComplexity(loaded.phasing_complexity || "medium");
         setAccessWindowConstraints(loaded.access_window_constraints || "low");
         setWorkingHourRestrictions(loaded.working_hour_restrictions || "low");
+        setFixedCompletionDeadline(Boolean(loaded.fixed_completion_deadline));
+        setClientDeadlineSensitivity(
+          loaded.client_deadline_sensitivity || "medium"
+        );
+        setLdPenaltyExposure(loaded.ld_penalty_exposure || "low");
+        setExecutionContinuityRequired(
+          Boolean(loaded.execution_continuity_required)
+        );
       } catch (error: any) {
         setProject(null);
         setMessage(error?.message || "Could not load project.");
@@ -247,7 +299,7 @@ export default function Step2Page() {
     const { error } = await supabase
       .from("projects")
       .update({
-        project_value: projectValueRaw || null,
+        project_value: projectValueRaw ? Number(projectValueRaw) : null,
         start_date: startDate || null,
         end_date: endDate || null,
         budget_confidence: budgetConfidence || null,
@@ -257,6 +309,10 @@ export default function Step2Page() {
         phasing_complexity: phasingComplexity || null,
         access_window_constraints: accessWindowConstraints || null,
         working_hour_restrictions: workingHourRestrictions || null,
+        fixed_completion_deadline: fixedCompletionDeadline,
+        client_deadline_sensitivity: clientDeadlineSensitivity || null,
+        ld_penalty_exposure: ldPenaltyExposure || null,
+        execution_continuity_required: executionContinuityRequired,
         updated_at: new Date().toISOString(),
       })
       .eq("id", projectId);
@@ -285,6 +341,13 @@ export default function Step2Page() {
       setSaving(true);
       setMessage("");
 
+      if (startDate && endDate) {
+        const diff = calculateDurationDays(startDate, endDate);
+        if (diff !== null && diff < 0) {
+          throw new Error("End date cannot be earlier than the start date.");
+        }
+      }
+
       const error = await saveStep();
       if (error) throw error;
 
@@ -297,10 +360,10 @@ export default function Step2Page() {
 
   if (loading) {
     return (
-      <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <p className="text-sm text-slate-600">Loading Step 2...</p>
+      <section className="min-h-screen bg-[#F4F7FB] px-6 py-10">
+        <div className="mx-auto max-w-[1160px]">
+          <div className="rounded-[28px] border border-[#D8E1EC] bg-white p-8 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+            <p className="text-sm font-medium text-[#4B5B73]">Loading step 2...</p>
           </div>
         </div>
       </section>
@@ -309,19 +372,19 @@ export default function Step2Page() {
 
   if (!project) {
     return (
-      <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
-        <div className="mx-auto max-w-5xl">
-          <div className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+      <section className="min-h-screen bg-[#F4F7FB] px-6 py-10">
+        <div className="mx-auto max-w-[1160px]">
+          <div className="rounded-[28px] border border-[#D8E1EC] bg-white p-8 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+            <h1 className="text-2xl font-semibold tracking-tight text-[#0F172A]">
               Project not found
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-[#4B5B73]">
               {message || "We could not load this project for the intake flow."}
             </p>
 
             <button
               onClick={() => router.push("/app")}
-              className="mt-6 inline-flex h-11 items-center rounded-2xl border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="mt-6 inline-flex h-11 items-center rounded-2xl border border-[#D8E1EC] bg-white px-5 text-sm font-medium text-[#1E293B] transition hover:bg-[#F8FAFC]"
             >
               Back to projects
             </button>
@@ -332,70 +395,72 @@ export default function Step2Page() {
   }
 
   return (
-    <section className="min-h-screen bg-[#f5f7fb] px-6 py-12">
-      <div className="mx-auto w-full max-w-6xl">
+    <section className="min-h-screen bg-[#F4F7FB] px-6 py-10">
+      <div className="mx-auto w-full max-w-[1160px]">
         <div className="mb-8">
-          <p className="text-sm font-semibold text-violet-600">Step 2 of 8</p>
+          <p className="text-sm font-semibold tracking-[0.02em] text-[#2457FF]">
+            Step 2 of 8
+          </p>
 
-          <h1 className="mt-3 text-5xl font-semibold tracking-[-0.04em] text-slate-950">
+          <h1 className="mt-3 text-4xl font-semibold tracking-[-0.045em] text-[#081226] md:text-[52px]">
             Commercial & schedule context
           </h1>
 
-          <p className="mt-3 max-w-4xl text-[15px] leading-7 text-slate-600">
-            Add the commercial and planning context for{" "}
-            <span className="font-medium text-slate-800">
+          <p className="mt-4 max-w-4xl text-[15px] leading-7 text-[#4B5B73]">
+            Add the commercial and delivery pressure context for{" "}
+            <span className="font-semibold text-[#0F172A]">
               {project.name || "this project"}
             </span>
-            . This helps RiskBases understand delivery scale, timeline pressure and
-            early procurement exposure.
+            . This helps RiskBases assess schedule sensitivity, deadline exposure,
+            procurement pressure and execution continuity.
           </p>
 
-          <div className="mt-8 flex items-center gap-5">
-            <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div className="mt-8 flex items-center gap-4">
+            <div className="h-3 flex-1 overflow-hidden rounded-full bg-[#DCE4EE]">
               <div
-                className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                className="h-full rounded-full bg-[#2457FF] transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
 
-            <div className="flex h-12 min-w-[88px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800">
+            <div className="flex h-11 min-w-[74px] items-center justify-center rounded-2xl border border-[#D8E1EC] bg-white px-4 text-sm font-semibold text-[#0F172A]">
               {progress}%
             </div>
           </div>
         </div>
 
         {message && (
-          <div className="mb-6 rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+          <div className="mb-6 rounded-[22px] border border-[#D8E1EC] bg-white px-5 py-4 text-sm text-[#4B5B73] shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
             {message}
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[32px] border border-slate-200/80 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)] md:p-10">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="rounded-[32px] border border-[#D8E1EC] bg-white p-8 shadow-[0_14px_36px_rgba(15,23,42,0.05)] md:p-10">
             <div className="mb-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#C9D8FF] bg-[#EEF4FF] px-3 py-1 text-xs font-semibold text-[#2457FF]">
                 <Wallet className="h-4 w-4" />
                 Planning profile
               </div>
 
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
-                Budget, timeline and delivery pressure
+              <h2 className="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-[#081226]">
+                Budget, timing and delivery pressure
               </h2>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                This step should stay structured and commercial. No stakeholder fields,
-                no site fields, no long text areas.
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#4B5B73]">
+                Keep this step structured and commercial. No location fields, no
+                stakeholder fields and no long free-text notes here.
               </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Project value / budget
                 </label>
 
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#64748B]">
                     €
                   </span>
 
@@ -403,24 +468,24 @@ export default function Step2Page() {
                     value={formattedBudget}
                     onChange={(e) => setProjectValueRaw(onlyDigits(e.target.value))}
                     inputMode="numeric"
-                    placeholder="2,000,000"
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] pl-9 pr-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                    placeholder="2.000.000"
+                    className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] pl-9 pr-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                   />
                 </div>
 
-                <p className="mt-2 text-xs leading-5 text-slate-500">
+                <p className="mt-2 text-xs leading-5 text-[#6B7A90]">
                   Enter numbers only. The amount is formatted automatically.
                 </p>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Budget confidence
                 </label>
                 <select
                   value={budgetConfidence}
                   onChange={(e) => setBudgetConfidence(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low confidence</option>
                   <option value="medium">Medium confidence</option>
@@ -429,13 +494,13 @@ export default function Step2Page() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Schedule pressure
                 </label>
                 <select
                   value={schedulePressure}
                   onChange={(e) => setSchedulePressure(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -444,7 +509,7 @@ export default function Step2Page() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Start date
                 </label>
                 <div className="relative">
@@ -452,14 +517,14 @@ export default function Step2Page() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 pr-12 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                    className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 pr-12 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                   />
-                  <CalendarRange className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <CalendarRange className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   End date
                 </label>
                 <div className="relative">
@@ -467,20 +532,49 @@ export default function Step2Page() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 pr-12 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                    className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 pr-12 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                   />
-                  <CalendarRange className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <CalendarRange className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
                 </div>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
+                  Fixed completion deadline?
+                </label>
+                <select
+                  value={fixedCompletionDeadline ? "yes" : "no"}
+                  onChange={(e) => setFixedCompletionDeadline(e.target.value === "yes")}
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
+                  Client deadline sensitivity
+                </label>
+                <select
+                  value={clientDeadlineSensitivity}
+                  onChange={(e) => setClientDeadlineSensitivity(e.target.value)}
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Deadline criticality
                 </label>
                 <select
                   value={deadlineCriticality}
                   onChange={(e) => setDeadlineCriticality(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -489,13 +583,28 @@ export default function Step2Page() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
+                  LD / penalty exposure
+                </label>
+                <select
+                  value={ldPenaltyExposure}
+                  onChange={(e) => setLdPenaltyExposure(e.target.value)}
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Procurement lead-time exposure
                 </label>
                 <select
                   value={procurementLeadRisk}
                   onChange={(e) => setProcurementLeadRisk(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -504,13 +613,13 @@ export default function Step2Page() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Phasing complexity
                 </label>
                 <select
                   value={phasingComplexity}
                   onChange={(e) => setPhasingComplexity(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -519,13 +628,13 @@ export default function Step2Page() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Access window constraints
                 </label>
                 <select
                   value={accessWindowConstraints}
                   onChange={(e) => setAccessWindowConstraints(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -533,14 +642,30 @@ export default function Step2Page() {
                 </select>
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
+                  Execution continuity required?
+                </label>
+                <select
+                  value={executionContinuityRequired ? "yes" : "no"}
+                  onChange={(e) =>
+                    setExecutionContinuityRequired(e.target.value === "yes")
+                  }
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+
               <div className="md:col-span-2">
-                <label className="mb-2 block text-sm font-medium text-slate-800">
+                <label className="mb-2 block text-sm font-medium text-[#1E293B]">
                   Working hour restrictions
                 </label>
                 <select
                   value={workingHourRestrictions}
                   onChange={(e) => setWorkingHourRestrictions(e.target.value)}
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-4 text-[15px] text-slate-900 outline-none transition focus:border-violet-400 focus:bg-white"
+                  className="h-14 w-full rounded-2xl border border-[#D8E1EC] bg-[#F8FAFC] px-4 text-[15px] text-[#0F172A] outline-none transition focus:border-[#2457FF] focus:bg-white focus:ring-4 focus:ring-[#2457FF]/10"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -549,95 +674,106 @@ export default function Step2Page() {
               </div>
             </div>
 
-            <div className="mt-8 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <div className="mt-8 rounded-[24px] border border-[#D8E1EC] bg-[#F8FAFC] p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7A90]">
                 Duration signal
               </p>
-              <p className="mt-2 text-sm font-medium text-slate-800">
+              <p className="mt-2 text-sm font-medium text-[#0F172A]">
                 {durationLabel}
               </p>
 
-              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7A90]">
                 Planning signal
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
+              <p className="mt-2 text-sm leading-6 text-[#36506C]">
                 {planningSignal}
               </p>
             </div>
 
-            <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
+            <div className="mt-10 flex flex-col gap-3 border-t border-[#E2E8F0] pt-6 sm:flex-row sm:items-center sm:justify-between">
               <button
-                onClick={() => router.push(`/app/projects/${projectId}/intake/step-1`)}
-                className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={() => router.push(`/intake/${projectId}/step-1`)}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#D8E1EC] bg-white px-5 text-sm font-medium text-[#1E293B] transition hover:bg-[#F8FAFC]"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={handleSaveDraft}
                   disabled={saving}
-                  className="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 px-5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#D8E1EC] bg-white px-5 text-sm font-medium text-[#1E293B] transition hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
                   {saving ? "Saving..." : "Save draft"}
                 </button>
 
                 <button
                   onClick={handleNext}
                   disabled={saving}
-                  className="inline-flex h-12 items-center gap-2 rounded-2xl bg-violet-500 px-6 text-sm font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#2457FF] px-6 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(36,87,255,0.22)] transition hover:bg-[#1D4BE0] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
                   {saving ? "Saving..." : "Next step"}
                 </button>
               </div>
             </div>
           </div>
 
-          <aside className="h-fit rounded-[32px] border border-slate-200/80 bg-white p-7 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-            <h3 className="text-lg font-semibold text-slate-950">Why this step matters</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              RiskBases uses project size and timing to estimate which baseline risks
-              are more likely to matter during setup.
+          <aside className="h-fit rounded-[32px] border border-[#D8E1EC] bg-white p-7 shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
+            <h3 className="text-xl font-semibold tracking-tight text-[#081226]">
+              Why this step matters
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-[#4B5B73]">
+              RiskBases uses project size, deadline sensitivity and delivery pressure
+              to estimate which baseline risks are most likely to matter early.
             </p>
 
             <div className="mt-6 space-y-3">
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <div className="rounded-2xl bg-[#F8FAFC] px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7A90]">
                   Used for
                 </p>
-                <p className="mt-2 text-sm text-slate-800">
-                  Scale-based risk relevance
+                <p className="mt-2 text-sm font-medium text-[#0F172A]">
+                  Commercial delivery pressure
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <div className="rounded-2xl bg-[#F8FAFC] px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7A90]">
                   Used for
                 </p>
-                <p className="mt-2 text-sm text-slate-800">
-                  Planning and duration pressure
+                <p className="mt-2 text-sm font-medium text-[#0F172A]">
+                  Deadline and procurement exposure
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <div className="rounded-2xl bg-[#F8FAFC] px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6B7A90]">
                   Used for
                 </p>
-                <p className="mt-2 text-sm text-slate-800">
-                  Procurement and sequencing signals
+                <p className="mt-2 text-sm font-medium text-[#0F172A]">
+                  Planning and sequencing signals
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <div className="mt-8 rounded-[24px] border border-[#DCE7FF] bg-[#F7FAFF] p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#2457FF]">
                 Step rule
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                Keep this step commercial and schedule-focused only. No location, no stakeholders and no long free-text fields.
+              <p className="mt-3 text-sm leading-6 text-[#36506C]">
+                Keep this step commercial and schedule-focused only. Location,
+                approvals, technical unknowns and stakeholders belong in later steps.
               </p>
             </div>
           </aside>
